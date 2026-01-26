@@ -2,11 +2,12 @@ import streamlit as st
 import math
 
 # Configuração da página para visualização ampla
-st.set_page_config(page_title="Dimensionamento Micronics V14", layout="wide")
+st.set_page_config(page_title="Dimensionamento Micronics V15", layout="wide")
 
 st.title("🛠️ Dimensionador de Filtro Prensa - Micronics")
 
-# --- CABEÇALHO DE IDENTIFICAÇÃO ---
+# --- CABEÇALHO DE IDENTIFICAÇÃO (Organizado em duas linhas) ---
+# Linha 1: Dados do Cliente e Projeto
 col_c, col_p, col_pr = st.columns(3)
 with col_c:
     cliente = st.text_input("👤 Nome do Cliente", placeholder="Ex: Arcor, Gerdau...")
@@ -14,6 +15,15 @@ with col_p:
     projeto = st.text_input("📂 Nome do Projeto", placeholder="Ex: Expansão Linha 02")
 with col_pr:
     produto = st.text_input("📦 Produto a ser filtrado", placeholder="Ex: Concentrado de Zinco")
+
+# Linha 2: Controle Interno
+col_opp, col_resp, col_vazio = st.columns(3)
+with col_opp:
+    n_opp = st.text_input("🔢 Nº OPP", placeholder="Ex: 2024-001")
+with col_resp:
+    responsavel = st.text_input("👨‍💻 Responsável pelo projeto", placeholder="Seu nome")
+with col_vazio:
+    st.write("") # Espaço vazio para manter o alinhamento
 
 st.markdown("---")
 
@@ -67,10 +77,10 @@ col2.metric("Massa p/ Ciclo", f"{massa_seco_ciclo:.2f} t")
 col3.metric("Vol. Torta p/ Ciclo", f"{vol_total_L:.0f} L")
 col4.metric("Ciclos p/ Dia", f"{ciclos_dia:.1f}")
 
-with st.expander("📋 Detalhes do Projeto e Opcionais"):
+with st.expander("📋 Detalhes Adicionais e de Controle"):
     c1, c2, c3 = st.columns(3)
-    c1.write(f"**Cliente:** {cliente if cliente else '-'}")
-    c1.write(f"**Projeto:** {projeto if projeto else '-'}")
+    c1.write(f"**Nº OPP:** {n_opp if n_opp else '-'}")
+    c1.write(f"**Responsável:** {responsavel if responsavel else '-'}")
     c2.write(f"**Temp:** {temp_processo} °C | **pH:** {ph_solucao}")
     c2.write(f"**Lavador Lonas:** {lavador_lonas}")
     c3.write(f"**Automação:** {aut_nivel} | **Lavador Torta:** {lavador_torta}")
