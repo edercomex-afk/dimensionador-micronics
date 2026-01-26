@@ -118,3 +118,16 @@ for i, p in enumerate(tamanhos):
     })
 
 st.table(res_list)
+st.markdown("---")
+st.subheader("📤 Finalizar Estudo")
+
+if st.button("Gerar Documento PDF"):
+    # 'res_list' e a lista que ja criamos no seu loop de calculo
+    pdf_saida = gerar_pdf(cliente, projeto, n_opp, responsavel, res_list)
+    
+    st.download_button(
+        label="📥 Baixar Proposta Técnica",
+        data=pdf_saida,
+        file_name=f"Dimensionamento_{cliente}_{n_opp}.pdf",
+        mime="application/pdf"
+    )
