@@ -2,11 +2,11 @@ import streamlit as st
 import math
 
 # Configuração da página
-st.set_page_config(page_title="Dimensionamento Micronics V8", layout="wide")
+st.set_page_config(page_title="Dimensionamento Micronics V9", layout="wide")
 
 st.title("🛠️ Dimensionador de Filtro Prensa - Micronics")
 
-# --- CABEÇALHO DE IDENTIFICAÇÃO (Topo da página) ---
+# --- CABEÇALHO DE IDENTIFICAÇÃO ---
 col_c, col_p, col_pr = st.columns(3)
 with col_c:
     cliente = st.text_input("👤 Nome do Cliente", placeholder="Ex: Arcor, Gerdau...")
@@ -17,20 +17,21 @@ with col_pr:
 
 st.markdown("---")
 
-# --- SIDEBAR: ENTRADA DE DADOS ---
-st.sidebar.header("🚀 Entrada de Capacidade")
+# --- SIDEBAR: ENTRADA DE DADOS MANUAIS ---
+st.sidebar.header("🚀 Capacidade e Operação")
 solidos_dia = st.sidebar.number_input("Peso Total de Sólidos Secos (ton/dia)", value=100.0, step=1.0)
-
-st.sidebar.header("📊 Disponibilidade e Operação")
-horas_op = st.sidebar.slider("Disponibilidade (Horas de operação/dia)", 1, 24, 20)
-tempo_ciclo = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60)
+# Mudado de barra para campo manual:
+horas_op = st.sidebar.number_input("Disponibilidade (Horas de operação/dia)", min_value=0.1, max_value=24.0, value=20.0, step=0.5)
+tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60, step=1)
 
 st.sidebar.header("🧪 Propriedades Físicas")
-sg_solidos = st.sidebar.number_input("Gravidade Específica (Sólidos Secos)", value=2.8)
-umidade = st.sidebar.slider("Umidade Final da Torta (%)", 15, 25, 20) / 100
+sg_solidos = st.sidebar.number_input("Gravidade Específica (Sólidos Secos)", value=2.8, step=0.1)
+# Mudado de barra para campo manual:
+umidade_input = st.sidebar.number_input("Umidade Final da Torta (%)", min_value=0.0, max_value=100.0, value=20.0, step=0.5)
+umidade = umidade_input / 100
 
 st.sidebar.header("📝 Detalhes Técnicos")
-temp_processo = st.sidebar.number_input("Temperatura de Processo (°C)", value=25)
+temp_processo = st.sidebar.number_input("Temperatura de Processo (°C)", value=25, step=1)
 ph_solucao = st.sidebar.number_input("pH da Solução", min_value=0.0, max_value=14.0, value=7.0, step=0.1)
 lavador_lonas = st.sidebar.selectbox("Lavador de Lonas?", ["Sim", "Não"])
 aut_nivel = st.sidebar.selectbox("Nível de Automatização", ["Baixo", "Médio", "Alto"])
@@ -38,7 +39,7 @@ lavador_torta = st.sidebar.selectbox("Lavador de Torta?", ["Sim", "Não"])
 membrana = st.sidebar.selectbox("Membrana de Compressão?", ["Sim", "Não"])
 
 st.sidebar.header("📐 Geometria da Placa")
-recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", min_value=1, max_value=100, value=30)
+recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", min_value=1.0, max_value=100.0, value=30.0, step=1.0)
 
 # --- BASE DE DADOS TÉCNICA (Micronics) ---
 tamanhos = [
@@ -53,20 +54,24 @@ tamanhos = [
 ]
 
 # --- LÓGICA DE CÁLCULO ---
-ciclos_dia = (horas_op * 60) / tempo_ciclo
-massa_seco_ciclo = solidos_dia / ciclos_dia
-dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0))
-vol_torta_m3 = (massa_seco_ciclo / (1 - umidade)) / dens_torta
+# Ciclos por dia
+ciclos_dia = (horas_op * 60) / tempo_cycle if tempo_cycle > 0 else 0
+# Massa por ciclo
+massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
+# Densidade da torta úmida (Sólido + Água)
+dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
+# Volume total de torta por ciclo (L)
+vol_torta_m3 = (massa_seco_ciclo / (1 - umidade)) / dens_torta if (1-umidade) > 0 else 0
 vol_total_L = vol_torta_m3 * 1000
 
 # --- EXIBIÇÃO ---
-st.subheader(f"Resumo Técnico: {produto if produto else 'Não especificado'}")
+st.subheader(f"Resumo Técnico: {produto if produto else 'Geral'}")
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Massa Seca Total", f"{solidos_dia:.1f} t/dia")
 col2.metric("Massa p/ Ciclo", f"{massa_seco_ciclo:.2f} t")
 col3.metric("Vol. Torta p/ Ciclo", f"{vol_total_L:.0f} L")
-col4.metric("Espessura Câmara", f"{recesso_manual} mm")
+col4.metric("Ciclos p/ Dia", f"{ciclos_dia:.1f}")
 
 with st.expander("📋 Ver Detalhes do Projeto e Opcionais"):
     c1, c2, c3 = st.columns(3)
@@ -81,8 +86,9 @@ st.subheader("📋 Opções de Dimensionamento Sugeridas")
 
 res_list = []
 for p in tamanhos:
+    # Ajuste proporcional do volume baseado no recesso (Ref: 30mm)
     vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
-    num_placas = math.ceil(vol_total_L / vol_ajustado)
+    num_placas = math.ceil(vol_total_L / vol_ajustado) if vol_ajustado > 0 else 0
     area_total = num_placas * p["area_ref"]
     
     status = "✅ OK"
