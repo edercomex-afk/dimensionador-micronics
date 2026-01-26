@@ -76,4 +76,31 @@ with st.expander("📋 Ver Detalhes do Projeto e Opcionais"):
     c3.write(f"**Automação:** {aut_nivel} | **Lavador Torta:** {lavador_torta}")
     c3.write(f"**Membrana:** {membrana}")
 
-st.subheader("📋 Opções de Dimension
+st.subheader("📋 Opções de Dimensionamento e Fornecedores")
+
+res_list = []
+for p in tamanhos:
+    vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
+    num_placas = math.ceil(vol_total_L / vol_ajustado) if vol_ajustado > 0 else 0
+    area_total = num_placas * p["area_ref"]
+    
+    status = "✅ OK"
+    obs = "-"
+    if p["nom"] == 1500 and num_placas > 120:
+        status = "⚠️ Dividir"
+        obs = f"Sugerido 2 filtros de {math.ceil(num_placas/2)} placas"
+    elif num_placas > p["max"]:
+        status = "❌ Excede Limite"
+        obs = f"Máximo: {p['max']} placas"
+    
+    res_list.append({
+        "Modelo (mm)": f"{p['nom']} x {p['nom']}",
+        "Placas Necessárias": num_placas,
+        "Área Total (m²)": f"{area_total:.2f}",
+        "Vol. Câmara (L)": f"{vol_ajustado:.1f}",
+        "Fornecedores": p["forn"],
+        "Status": status,
+        "Observação": obs
+    })
+
+st.table(res_list)
