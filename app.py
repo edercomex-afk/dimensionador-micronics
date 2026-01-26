@@ -1,51 +1,24 @@
-from fpdf import FPDF  # Biblioteca para gerar o PDFimport streamlit as st
-def gerar_pdf(cliente, projeto, opp, responsavel, dados_tabela):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Cabeçalho
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(190, 10, "Relatorio de Dimensionamento - Cleanova Micronics", ln=True, align="C")
-    pdf.ln(10)
-    
-    # Informacoes do Projeto
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 8, f"Cliente: {cliente}", ln=True)
-    pdf.cell(190, 8, f"Projeto: {projeto}", ln=True)
-    pdf.cell(190, 8, f"OPP: {opp} | Responsavel: {responsavel}", ln=True)
-    pdf.ln(10)
-    
-    # Tabela de Resultados
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(50, 10, "Modelo", 1)
-    pdf.cell(30, 10, "Placas", 1)
-    pdf.cell(40, 10, "Area (m2)", 1)
-    pdf.cell(40, 10, "Fluxo (L/m2h)", 1)
-    pdf.cell(30, 10, "Status", 1, ln=True)
-    
-    pdf.set_font("Arial", "", 10)
-    for r in dados_tabela:
-        pdf.cell(50, 10, r["Modelo (mm)"], 1)
-        pdf.cell(30, 10, str(r["Placas"]), 1)
-        pdf.cell(40, 10, r["Área Total (m²)"], 1)
-        pdf.cell(40, 10, r["Taxa Fluxo (L/m²h)"], 1)
-        pdf.cell(30, 10, r["Status"], 1, ln=True)
-        
-    return pdf.output(dest="S").encode("latin-1")
+import streamlit as st
 import math
 import os
 
 # Configuração da página
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
-# --- LÓGICA DO LOGOTIPO (Via Link Direto para garantir exibição) ---
+# --- LÓGICA DO LOGOTIPO ---
+logo_path = "logo.png"
 logo_url = "https://www.cleanova.com/wp-content/uploads/2023/10/Cleanova_Logo_Main_RGB.png"
-col_logo, col_titulo = st.columns([1, 3])
-with col_logo:
-    st.image(logo_url, width=350)
-with col_titulo:
-    st.title("Dimensionador de Filtro Prensa")
-st.sidebar.image(logo_url, use_container_width=True)
+
+if os.path.exists(logo_path):
+    st.sidebar.image(logo_path, use_container_width=True)
+    col_l, col_t = st.columns([1, 3])
+    with col_l: st.image(logo_path, width=350)
+    with col_t: st.title("Dimensionador de Filtro Prensa")
+else:
+    st.sidebar.image(logo_url, use_container_width=True)
+    col_l, col_t = st.columns([1, 3])
+    with col_l: st.image(logo_url, width=350)
+    with col_t: st.title("Dimensionador de Filtro Prensa")
 
 st.markdown("---")
 
@@ -55,28 +28,21 @@ with c1: cliente = st.text_input("👤 Nome do Cliente")
 with c2: projeto = st.text_input("📂 Nome do Projeto")
 with c3: produto = st.text_input("📦 Produto")
 
-col_opp, col_resp, col_vazio = st.columns(3)
-with col_opp: n_opp = st.text_input("🔢 Nº OPP")
-with col_resp: responsavel = st.text_input("👨‍💻 Responsável")
-
-st.markdown("---")
-
 # --- SIDEBAR: ENTRADA DE DADOS ---
 st.sidebar.header("🚀 Capacidade e Operação")
-solidos_dia = st.sidebar.number_input("Peso Total Sólidos Secos (ton/dia)", value=100.0, step=1.0)
-horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", value=20.0, step=0.5)
-tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60, step=1)
+solidos_dia = st.sidebar.number_input("Peso Total Sólidos Secos (ton/dia)", value=100.0)
+horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", value=20.0)
+tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60)
 
-# SEÇÃO CONSOLIDADA: FLUXO DE POLPA
 st.sidebar.header("💧 Fluxo de Polpa")
-vol_polpa_dia = st.sidebar.number_input("Volume de Lodo/Polpa por dia (m³/dia)", value=500.0, step=10.0)
-vazao_lh = st.sidebar.number_input("Vazão de Alimentação de Polpa (L/h)", value=50000.0, step=1000.0)
+vol_polpa_dia = st.sidebar.number_input("Volume de Lodo/Polpa (m³/dia)", value=500.0)
+vazao_lh = st.sidebar.number_input("Vazão de Alimentação (L/h)", value=50000.0)
 
 st.sidebar.header("🧪 Propriedades Físicas")
-sg_solidos = st.sidebar.number_input("Gravidade Específica (Sólidos Secos)", value=2.8, step=0.1)
-umidade_input = st.sidebar.number_input("Umidade Final da Torta (%)", value=20.0, step=0.5)
+sg_solidos = st.sidebar.number_input("Gravidade Específica", value=2.8)
+umidade_input = st.sidebar.number_input("Umidade Final Torta (%)", value=20.0)
+recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", value=30.0)
 umidade = umidade_input / 100
-recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", value=30.0, step=1.0)
 
 # --- BASE DE DADOS TÉCNICA ---
 tamanhos = [
@@ -84,30 +50,16 @@ tamanhos = [
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
     {"nom": 1500, "area_ref": 4.50, "vol_ref": 70,  "max": 120},
     {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100},
-    {"nom": 1000, "area_ref": 1.80, "vol_ref": 25,  "max": 100},
-    {"nom": 800,  "area_ref": 1.10, "vol_ref": 15,  "max": 84},
-    {"nom": 630,  "area_ref": 0.65, "vol_ref": 9,   "max": 74},
-    {"nom": 400,  "area_ref": 0.25, "vol_ref": 3,   "max": 74},
 ]
 
 # --- LÓGICA DE CÁLCULO ---
 ciclos_dia = (horas_op * 60) / tempo_cycle if tempo_cycle > 0 else 0
 massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
-vol_polpa_ciclo_L = (vol_polpa_dia / ciclos_dia) * 1000 if ciclos_dia > 0 else 0
-
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
-vol_torta_m3 = (massa_seco_ciclo / (1 - umidade)) / dens_torta if (1-umidade) > 0 else 0
-vol_total_L_req = vol_torta_m3 * 1000
+vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
 
-# --- EXIBIÇÃO DE MÉTRICAS ---
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Vol. Polpa p/ Ciclo", f"{vol_polpa_ciclo_L:,.0f} L")
-col2.metric("Vol. Torta p/ Ciclo", f"{vol_total_L_req:,.0f} L")
-col3.metric("Conc. Sólidos Calc.", f"{(solidos_dia/vol_polpa_dia)*100:.1f} %" if vol_polpa_dia > 0 else "0%")
-col4.metric("Ciclos p/ Dia", f"{ciclos_dia:.1f}")
-
-st.subheader("📋 Opções de Dimensionamento e Consultoria Técnica")
-
+# --- TABELA DE RESULTADOS (SOLUÇÃO ÚNICA) ---
+st.subheader("📋 Opções de Dimensionamento (Filtro Único)")
 res_list = []
 for i, p in enumerate(tamanhos):
     vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
@@ -115,49 +67,39 @@ for i, p in enumerate(tamanhos):
     area_total = num_placas * p["area_ref"]
     fluxo = vazao_lh / area_total if area_total > 0 else 0
     
-    status = "✅ OK"
-    obs = "-"
-    
-    # LÓGICA DE SUGESTÃO E ALERTAS
-    if vol_total_L_req > vol_polpa_ciclo_L:
-        status = "❌ Erro Dados"
-        obs = "Volume de torta calculado > Volume de polpa alimentado."
-    elif num_placas > p["max"]:
-        status = "❌ Excedeu Placas"
-        sugestao = None
-        # Busca modelo maior que comporte o volume
-        for j in range(i - 1, -1, -1): 
-            p_maior = tamanhos[j]
-            vol_aj_maior = p_maior["vol_ref"] * (recesso_manual / 30)
-            placas_maior = math.ceil(vol_total_L_req / vol_aj_maior)
-            if placas_maior <= p_maior["max"]:
-                sugestao = f"Sugerido: {p_maior['nom']}x{p_maior['nom']} com {placas_maior} placas."
-                break
-        obs = f"Máx {p['max']} placas. {sugestao if sugestao else 'Dividir em 2 filtros.'}"
-    elif fluxo > 500:
-        status = "⚠️ Fluxo Alto"
-        obs = f"Taxa de {fluxo:.0f} L/m²h acima do ideal."
-    
     res_list.append({
         "Modelo (mm)": f"{p['nom']} x {p['nom']}",
         "Placas": num_placas,
         "Área Total (m²)": f"{area_total:.2f}",
-        "Taxa Fluxo (L/m²h)": f"{fluxo:.1f}",
-        "Status": status,
-        "Observação": obs
+        "Fluxo (L/m²h)": f"{fluxo:.1f}",
+        "Status": "✅ OK" if num_placas <= p["max"] else "❌ Excede Limite"
+    })
+st.table(res_list)
+
+# --- NOVO QUADRO: ALTERNATIVAS MULTI-FILTRO ---
+st.markdown("---")
+st.subheader("🔄 Alternativas com Filtros em Paralelo (Redundância)")
+st.info("Abaixo, calculamos a configuração necessária caso opte por dividir a carga em 2 equipamentos.")
+
+multi_list = []
+# Focamos em dividir para modelos de 1500 e 2000 que são comuns para paralelo
+for nom_alvo in [2000, 1500]:
+    p_ref = next(item for item in tamanhos if item["nom"] == nom_alvo)
+    vol_aj_ref = p_ref["vol_ref"] * (recesso_manual / 30)
+    
+    # Dividimos o volume total requerido por 2
+    placas_por_filtro = math.ceil((vol_total_L_req / 2) / vol_aj_ref)
+    area_por_filtro = placas_por_filtro * p_ref["area_ref"]
+    
+    status_multi = "✅ Recomendado" if placas_por_filtro <= p_ref["max"] else "⚠️ Limite Alto"
+    
+    multi_list.append({
+        "Configuração": f"2x Filtros {nom_alvo} x {nom_alvo}",
+        "Placas por Filtro": placas_por_filtro,
+        "Total de Placas": placas_por_filtro * 2,
+        "Área Total Combinada (m²)": f"{area_por_filtro * 2:.2f}",
+        "Vantagem": "Redundância (Se um parar, o outro mantém 50% da produção)",
+        "Status": status_multi
     })
 
-st.table(res_list)
-st.markdown("---")
-st.subheader("📤 Finalizar Estudo")
-
-if st.button("Gerar Documento PDF"):
-    # 'res_list' e a lista que ja criamos no seu loop de calculo
-    pdf_saida = gerar_pdf(cliente, projeto, n_opp, responsavel, res_list)
-    
-    st.download_button(
-        label="📥 Baixar Proposta Técnica",
-        data=pdf_saida,
-        file_name=f"Dimensionamento_{cliente}_{n_opp}.pdf",
-        mime="application/pdf"
-    )
+st.table(multi_list)
