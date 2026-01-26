@@ -1,55 +1,68 @@
 import streamlit as st
 import math
+import os
 
-# Configuração da página para visualização ampla
-st.set_page_config(page_title="Dimensionamento Micronics V15", layout="wide")
+# Configuração da página
+st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
-st.title("🛠️ Dimensionador de Filtro Prensa - Micronics")
-
-# --- CABEÇALHO DE IDENTIFICAÇÃO (Organizado em duas linhas) ---
-# Linha 1: Dados do Cliente e Projeto
-col_c, col_p, col_pr = st.columns(3)
-with col_c:
-    cliente = st.text_input("👤 Nome do Cliente", placeholder="Ex: Arcor, Gerdau...")
-with col_p:
-    projeto = st.text_input("📂 Nome do Projeto", placeholder="Ex: Expansão Linha 02")
-with col_pr:
-    produto = st.text_input("📦 Produto a ser filtrado", placeholder="Ex: Concentrado de Zinco")
-
-# Linha 2: Controle Interno
-col_opp, col_resp, col_vazio = st.columns(3)
-with col_opp:
-    n_opp = st.text_input("🔢 Nº OPP", placeholder="Ex: 2024-001")
-with col_resp:
-    responsavel = st.text_input("👨‍💻 Responsável pelo projeto", placeholder="Seu nome")
-with col_vazio:
-    st.write("") # Espaço vazio para manter o alinhamento
+# --- LÓGICA DO LOGOTIPO ---
+logo_path = "logo.png"
+if os.path.exists(logo_path):
+    col_logo, col_titulo = st.columns([1, 3])
+    with col_logo:
+        st.image(logo_path, width=350)
+    with col_titulo:
+        st.title("Dimensionador de Filtro Prensa")
+    st.sidebar.image(logo_path, use_container_width=True)
+else:
+    st.title("Cleanova Micronics | Dimensionador")
 
 st.markdown("---")
 
-# --- SIDEBAR: ENTRADA DE DADOS MANUAIS ---
+# --- CABEÇALHO DE IDENTIFICAÇÃO ---
+col_c, col_p, col_pr = st.columns(3)
+with col_c:
+    cliente = st.text_input("👤 Nome do Cliente")
+with col_p:
+    projeto = st.text_input("📂 Nome do Projeto")
+with col_pr:
+    produto = st.text_input("📦 Produto a ser filtrado")
+
+col_opp, col_resp, col_vazio = st.columns(3)
+with col_opp:
+    n_opp = st.text_input("🔢 Nº OPP")
+with col_resp:
+    responsavel = st.text_input("👨‍💻 Responsável")
+
+st.markdown("---")
+
+# --- SIDEBAR: ENTRADA DE DADOS ---
 st.sidebar.header("🚀 Capacidade e Operação")
-solidos_dia = st.sidebar.number_input("Peso Total de Sólidos Secos (ton/dia)", value=100.0, step=1.0)
-horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", min_value=0.1, max_value=24.0, value=20.0, step=0.5)
-tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60, step=1)
+solidos_dia = st.sidebar.number_input("Peso Total Sólidos Secos (ton/dia)", value=100.0)
+horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", value=20.0)
+tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60)
+
+# NOVA ENTRADA: VAZÃO DE ALIMENTAÇÃO
+st.sidebar.header("💧 Fluxo de Polpa")
+vazao_lh = st.sidebar.number_input("Vazão de Alimentação de Polpa (L/h)", value=50000.0, step=1000.0)
 
 st.sidebar.header("🧪 Propriedades Físicas")
-sg_solidos = st.sidebar.number_input("Gravidade Específica (Sólidos Secos)", value=2.8, step=0.1)
-umidade_input = st.sidebar.number_input("Umidade Final da Torta (%)", min_value=0.0, max_value=100.0, value=20.0, step=0.5)
+sg_solidos = st.sidebar.number_input("Gravidade Específica (Sólidos Secos)", value=2.8)
+umidade_input = st.sidebar.number_input("Umidade Final da Torta (%)", value=20.0)
 umidade = umidade_input / 100
 
 st.sidebar.header("📝 Detalhes Técnicos")
-temp_processo = st.sidebar.number_input("Temperatura de Processo (°C)", value=25, step=1)
-ph_solucao = st.sidebar.number_input("pH da Solução", min_value=0.0, max_value=14.0, value=7.0, step=0.1)
+temp_processo = st.sidebar.number_input("Temperatura (°C)", value=25)
+ph_solucao = st.sidebar.number_input("pH da Solução", value=7.0)
 lavador_lonas = st.sidebar.selectbox("Lavador de Lonas?", ["Sim", "Não"])
 aut_nivel = st.sidebar.selectbox("Nível de Automatização", ["Baixo", "Médio", "Alto"])
 lavador_torta = st.sidebar.selectbox("Lavador de Torta?", ["Sim", "Não"])
 membrana = st.sidebar.selectbox("Membrana de Compressão?", ["Sim", "Não"])
 
 st.sidebar.header("📐 Geometria da Placa")
-recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", min_value=1.0, max_value=100.0, value=30.0, step=1.0)
+recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", value=30.0)
 
-# --- BASE DE DADOS TÉCNICA (Micronics) ---
+# --- BASE DE DADOS TÉCNICA ---
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -68,25 +81,14 @@ dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos 
 vol_torta_m3 = (massa_seco_ciclo / (1 - umidade)) / dens_torta if (1-umidade) > 0 else 0
 vol_total_L = vol_torta_m3 * 1000
 
-# --- EXIBIÇÃO DE RESULTADOS ---
-st.subheader(f"Resumo Técnico: {produto if produto else 'Geral'}")
-
+# --- EXIBIÇÃO DE MÉTRICAS ---
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Massa Seca Total", f"{solidos_dia:.1f} t/dia")
+col1.metric("Vol. Torta p/ Ciclo", f"{vol_total_L:.0f} L")
 col2.metric("Massa p/ Ciclo", f"{massa_seco_ciclo:.2f} t")
-col3.metric("Vol. Torta p/ Ciclo", f"{vol_total_L:.0f} L")
+col3.metric("Vazão de Polpa", f"{vazao_lh:,.0f} L/h")
 col4.metric("Ciclos p/ Dia", f"{ciclos_dia:.1f}")
 
-with st.expander("📋 Detalhes Adicionais e de Controle"):
-    c1, c2, c3 = st.columns(3)
-    c1.write(f"**Nº OPP:** {n_opp if n_opp else '-'}")
-    c1.write(f"**Responsável:** {responsavel if responsavel else '-'}")
-    c2.write(f"**Temp:** {temp_processo} °C | **pH:** {ph_solucao}")
-    c2.write(f"**Lavador Lonas:** {lavador_lonas}")
-    c3.write(f"**Automação:** {aut_nivel} | **Lavador Torta:** {lavador_torta}")
-    c3.write(f"**Membrana:** {membrana}")
-
-st.subheader("📋 Opções de Dimensionamento")
+st.subheader("📋 Opções de Dimensionamento e Fluxo")
 
 res_list = []
 for p in tamanhos:
@@ -94,22 +96,31 @@ for p in tamanhos:
     num_placas = math.ceil(vol_total_L / vol_ajustado) if vol_ajustado > 0 else 0
     area_total = num_placas * p["area_ref"]
     
+    # CÁLCULO DA TAXA DE FILTRAÇÃO (Fluxo)
+    fluxo = vazao_lh / area_total if area_total > 0 else 0
+    
     status = "✅ OK"
     obs = "-"
-    if p["nom"] == 1500 and num_placas > 120:
+    
+    # Alerta de Fluxo (Exemplo: Alerta se acima de 450 L/m²h)
+    if fluxo > 450:
+        status = "⚠️ Fluxo Alto"
+        obs = f"Taxa de {fluxo:.0f} L/m²h excede recomendação."
+    elif p["nom"] == 1500 and num_placas > 120:
         status = "⚠️ Dividir"
-        obs = f"Sugerido 2 filtros de {math.ceil(num_placas/2)} placas"
+        obs = f"Sugerido 2 filtros de {math.ceil(num_placas/2)} placas."
     elif num_placas > p["max"]:
-        status = "❌ Excede Limite"
-        obs = f"Máximo: {p['max']} placas"
+        status = "❌ Excedeu Placas"
+        obs = f"Máximo {p['max']} placas."
     
     res_list.append({
         "Modelo (mm)": f"{p['nom']} x {p['nom']}",
-        "Placas Necessárias": num_placas,
+        "Placas": num_placas,
         "Área Total (m²)": f"{area_total:.2f}",
-        "Vol. Câmara (L)": f"{vol_ajustado:.1f}",
+        "Taxa Fluxo (L/m²h)": f"{fluxo:.1f}",
         "Status": status,
         "Observação": obs
     })
 
 st.table(res_list)
+st.info("💡 A Taxa de Fluxo (L/m²h) ajuda a validar se a lona e a bomba estão equilibradas para o ciclo desejado.")
