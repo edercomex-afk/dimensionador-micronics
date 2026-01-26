@@ -1,7 +1,37 @@
-import streamlit as st
-import math
-import os
 from fpdf import FPDF  # Biblioteca para gerar o PDFimport streamlit as st
+def gerar_pdf(cliente, projeto, opp, responsavel, dados_tabela):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Cabeçalho
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(190, 10, "Relatorio de Dimensionamento - Cleanova Micronics", ln=True, align="C")
+    pdf.ln(10)
+    
+    # Informacoes do Projeto
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 8, f"Cliente: {cliente}", ln=True)
+    pdf.cell(190, 8, f"Projeto: {projeto}", ln=True)
+    pdf.cell(190, 8, f"OPP: {opp} | Responsavel: {responsavel}", ln=True)
+    pdf.ln(10)
+    
+    # Tabela de Resultados
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(50, 10, "Modelo", 1)
+    pdf.cell(30, 10, "Placas", 1)
+    pdf.cell(40, 10, "Area (m2)", 1)
+    pdf.cell(40, 10, "Fluxo (L/m2h)", 1)
+    pdf.cell(30, 10, "Status", 1, ln=True)
+    
+    pdf.set_font("Arial", "", 10)
+    for r in dados_tabela:
+        pdf.cell(50, 10, r["Modelo (mm)"], 1)
+        pdf.cell(30, 10, str(r["Placas"]), 1)
+        pdf.cell(40, 10, r["Área Total (m²)"], 1)
+        pdf.cell(40, 10, r["Taxa Fluxo (L/m²h)"], 1)
+        pdf.cell(30, 10, r["Status"], 1, ln=True)
+        
+    return pdf.output(dest="S").encode("latin-1")
 import math
 import os
 
