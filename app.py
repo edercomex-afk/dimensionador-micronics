@@ -2,7 +2,7 @@ import streamlit as st
 import math
 
 # Configuração da página
-st.set_page_config(page_title="Dimensionamento Micronics V9", layout="wide")
+st.set_page_config(page_title="Dimensionamento Micronics V10", layout="wide")
 
 st.title("🛠️ Dimensionador de Filtro Prensa - Micronics")
 
@@ -20,13 +20,11 @@ st.markdown("---")
 # --- SIDEBAR: ENTRADA DE DADOS MANUAIS ---
 st.sidebar.header("🚀 Capacidade e Operação")
 solidos_dia = st.sidebar.number_input("Peso Total de Sólidos Secos (ton/dia)", value=100.0, step=1.0)
-# Mudado de barra para campo manual:
-horas_op = st.sidebar.number_input("Disponibilidade (Horas de operação/dia)", min_value=0.1, max_value=24.0, value=20.0, step=0.5)
+horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", min_value=0.1, max_value=24.0, value=20.0, step=0.5)
 tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60, step=1)
 
 st.sidebar.header("🧪 Propriedades Físicas")
 sg_solidos = st.sidebar.number_input("Gravidade Específica (Sólidos Secos)", value=2.8, step=0.1)
-# Mudado de barra para campo manual:
 umidade_input = st.sidebar.number_input("Umidade Final da Torta (%)", min_value=0.0, max_value=100.0, value=20.0, step=0.5)
 umidade = umidade_input / 100
 
@@ -43,24 +41,20 @@ recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", min_value=
 
 # --- BASE DE DADOS TÉCNICA (Micronics) ---
 tamanhos = [
-    {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
-    {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
-    {"nom": 1500, "area_ref": 4.50, "vol_ref": 70,  "max": 120},
-    {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100},
-    {"nom": 1000, "area_ref": 1.80, "vol_ref": 25,  "max": 100},
-    {"nom": 800,  "area_ref": 1.10, "vol_ref": 15,  "max": 84},
-    {"nom": 630,  "area_ref": 0.65, "vol_ref": 9,   "max": 74},
-    {"nom": 400,  "area_ref": 0.25, "vol_ref": 3,   "max": 74},
+    {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190, "forn": "Dewatering, Jing Jin, Bright"},
+    {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160, "forn": "Micronics, Dewatering, Jing Jin, Bright"},
+    {"nom": 1500, "area_ref": 4.50, "vol_ref": 70,  "max": 120, "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100, "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 1000, "area_ref": 1.80, "vol_ref": 25,  "max": 100, "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 800,  "area_ref": 1.10, "vol_ref": 15,  "max": 84,  "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 630,  "area_ref": 0.65, "vol_ref": 9,   "max": 74,  "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 400,  "area_ref": 0.25, "vol_ref": 3,   "max": 74,  "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
 ]
 
 # --- LÓGICA DE CÁLCULO ---
-# Ciclos por dia
 ciclos_dia = (horas_op * 60) / tempo_cycle if tempo_cycle > 0 else 0
-# Massa por ciclo
 massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
-# Densidade da torta úmida (Sólido + Água)
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
-# Volume total de torta por ciclo (L)
 vol_torta_m3 = (massa_seco_ciclo / (1 - umidade)) / dens_torta if (1-umidade) > 0 else 0
 vol_total_L = vol_torta_m3 * 1000
 
@@ -82,11 +76,10 @@ with st.expander("📋 Ver Detalhes do Projeto e Opcionais"):
     c3.write(f"**Automação:** {aut_nivel} | **Lavador Torta:** {lavador_torta}")
     c3.write(f"**Membrana:** {membrana}")
 
-st.subheader("📋 Opções de Dimensionamento Sugeridas")
+st.subheader("📋 Opções de Dimensionamento e Fornecedores")
 
 res_list = []
 for p in tamanhos:
-    # Ajuste proporcional do volume baseado no recesso (Ref: 30mm)
     vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
     num_placas = math.ceil(vol_total_L / vol_ajustado) if vol_ajustado > 0 else 0
     area_total = num_placas * p["area_ref"]
@@ -104,7 +97,7 @@ for p in tamanhos:
         "Modelo (mm)": f"{p['nom']} x {p['nom']}",
         "Placas Necessárias": num_placas,
         "Área Total (m²)": f"{area_total:.2f}",
-        "Vol. Câmara (L)": f"{vol_ajustado:.1f}",
+        "Fornecedores": p["forn"],
         "Status": status,
         "Observação": obs
     })
