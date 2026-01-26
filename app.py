@@ -7,22 +7,25 @@ from fpdf import FPDF
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (O motor do relatório)
+# FUNÇÃO PARA GERAR PDF (Atualizada com Mercado)
 # ---------------------------------------------------------
-def gerar_pdf_estudo(cliente, projeto, produto, res_unicos, res_multi):
+def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, res_unicos, res_multi):
     pdf = FPDF()
     pdf.add_page()
     
-    # Cabeçalho
+    # Cabeçalho do PDF
     pdf.set_font("Arial", "B", 16)
     pdf.cell(190, 10, "Estudo Tecnico de Dimensionamento - Cleanova Micronics", ln=True, align="C")
     pdf.ln(10)
     
-    # Informações Básicas
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 8, f"Cliente: {cliente}", ln=True)
-    pdf.cell(190, 8, f"Projeto: {projeto}", ln=True)
-    pdf.cell(190, 8, f"Produto: {produto}", ln=True)
+    # Informações do Projeto
+    pdf.set_font("Arial", "B", 11)
+    pdf.cell(95, 8, f"Cliente: {cliente}", 0)
+    pdf.cell(95, 8, f"Mercado: {mercado}", 0, ln=True)
+    pdf.cell(95, 8, f"Projeto: {projeto}", 0)
+    pdf.cell(95, 8, f"Produto: {produto}", 0, ln=True)
+    pdf.cell(95, 8, f"Nº OPP: {opp}", 0)
+    pdf.cell(95, 8, f"Responsavel: {resp}", 0, ln=True)
     pdf.ln(10)
     
     # Tabela 1: Filtro Único
@@ -43,28 +46,10 @@ def gerar_pdf_estudo(cliente, projeto, produto, res_unicos, res_multi):
         pdf.cell(40, 10, r["Fluxo (L/m²h)"], 1)
         pdf.cell(30, 10, r["Status"], 1, ln=True)
     
-    pdf.ln(10)
-    
-    # Tabela 2: Filtros em Paralelo
-    pdf.set_font("Arial", "B", 11)
-    pdf.cell(190, 10, "Alternativas em Paralelo (Redundancia):", ln=True)
-    pdf.set_font("Arial", "B", 9)
-    pdf.cell(60, 10, "Configuracao", 1)
-    pdf.cell(40, 10, "Placas/Filtro", 1)
-    pdf.cell(50, 10, "Area Total (m2)", 1)
-    pdf.cell(40, 10, "Status", 1, ln=True)
-    
-    pdf.set_font("Arial", "", 9)
-    for m in res_multi:
-        pdf.cell(60, 10, m["Configuração"], 1)
-        pdf.cell(40, 10, str(m["Placas por Filtro"]), 1)
-        pdf.cell(50, 10, m["Área Total Combinada (m²)"], 1)
-        pdf.cell(40, 10, m["Status"], 1, ln=True)
-        
     return pdf.output(dest="S").encode("latin-1")
 
 # ---------------------------------------------------------
-# LAYOUT E LÓGICA DO APP
+# LAYOUT E LOGOTIPO
 # ---------------------------------------------------------
 logo_path = "logo.png"
 logo_url = "https://www.cleanova.com/wp-content/uploads/2023/10/Cleanova_Logo_Main_RGB.png"
@@ -82,11 +67,18 @@ else:
 
 st.markdown("---")
 
-# --- CABEÇALHO ---
-c1, c2, c3 = st.columns(3)
-with c1: cliente = st.text_input("👤 Nome do Cliente")
-with c2: projeto = st.text_input("📂 Nome do Projeto")
-with c3: produto = st.text_input("📦 Produto")
+# --- CABEÇALHO (Ajustado com os campos faltantes e novo campo Mercado) ---
+row1_c1, row1_c2, row1_c3 = st.columns(3)
+with row1_c1: cliente = st.text_input("👤 Nome do Cliente")
+with row1_c2: projeto = st.text_input("📂 Nome do Projeto")
+with row1_c3: mercado = st.text_input("🏭 Mercado (Mineração, Química, etc.)")
+
+row2_c1, row2_c2, row2_c3 = st.columns(3)
+with row2_c1: produto = st.text_input("📦 Produto")
+with row2_c2: n_opp = st.text_input("🔢 Nº OPP")
+with row2_c3: responsavel = st.text_input("👨‍💻 Responsável pelo Projeto")
+
+st.markdown("---")
 
 # --- SIDEBAR: ENTRADA DE DADOS ---
 st.sidebar.header("🚀 Capacidade e Operação")
@@ -118,15 +110,14 @@ massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
 vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
 
-# --- TABELA DE RESULTADOS (SOLUÇÃO ÚNICA) ---
+# --- RESULTADOS ÚNICOS ---
 st.subheader("📋 Opções de Dimensionamento (Filtro Único)")
 res_list = []
-for i, p in enumerate(tamanhos):
+for p in tamanhos:
     vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
     num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
     area_total = num_placas * p["area_ref"]
     fluxo = vazao_lh / area_total if area_total > 0 else 0
-    
     res_list.append({
         "Modelo (mm)": f"{p['nom']} x {p['nom']}",
         "Placas": num_placas,
@@ -136,36 +127,9 @@ for i, p in enumerate(tamanhos):
     })
 st.table(res_list)
 
-# --- QUADRO: ALTERNATIVAS MULTI-FILTRO ---
+# --- RESULTADOS MULTI-FILTRO ---
 st.markdown("---")
-st.subheader("🔄 Alternativas com Filtros em Paralelo (Redundância)")
-st.info("Abaixo, calculamos a configuração necessária caso opte por dividir a carga em 2 equipamentos.")
-
+st.subheader("🔄 Alternativas com Filtros em Paralelo")
 multi_list = []
 for nom_alvo in [2000, 1500]:
     p_ref = next(item for item in tamanhos if item["nom"] == nom_alvo)
-    vol_aj_ref = p_ref["vol_ref"] * (recesso_manual / 30)
-    placas_por_filtro = math.ceil((vol_total_L_req / 2) / vol_aj_ref)
-    area_por_filtro = placas_por_filtro * p_ref["area_ref"]
-    
-    multi_list.append({
-        "Configuração": f"2x Filtros {nom_alvo} x {nom_alvo}",
-        "Placas por Filtro": placas_por_filtro,
-        "Total de Placas": placas_por_filtro * 2,
-        "Área Total Combinada (m²)": f"{area_por_filtro * 2:.2f}",
-        "Status": "✅ Recomendado" if placas_por_filtro <= p_ref["max"] else "⚠️ Limite Alto"
-    })
-st.table(multi_list)
-
-# ---------------------------------------------------------
-# BOTÃO DE DOWNLOAD PDF
-# ---------------------------------------------------------
-st.markdown("---")
-if st.button("📄 Gerar Relatório PDF"):
-    pdf_output = gerar_pdf_estudo(cliente, projeto, produto, res_list, multi_list)
-    st.download_button(
-        label="📥 Baixar Estudo Técnico",
-        data=pdf_output,
-        file_name=f"Estudo_Cleanova_{cliente}.pdf",
-        mime="application/pdf"
-    )
