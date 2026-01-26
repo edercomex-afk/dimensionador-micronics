@@ -14,35 +14,49 @@ if os.path.exists(logo_path):
     with col_titulo:
         st.title("Dimensionador de Filtro Prensa")
     st.sidebar.image(logo_path, use_container_width=True)
+else:
+    st.title("Cleanova Micronics | Dimensionador")
 
 st.markdown("---")
 
-# --- CABEÇALHO ---
-c1, c2, c3 = st.columns(3)
-with c1: cliente = st.text_input("👤 Cliente")
-with c2: projeto = st.text_input("📂 Projeto")
-with c3: produto = st.text_input("📦 Produto")
+# --- CABEÇALHO DE IDENTIFICAÇÃO ---
+col_c, col_p, col_pr = st.columns(3)
+with col_c: cliente = st.text_input("👤 Nome do Cliente")
+with col_p: projeto = st.text_input("📂 Nome do Projeto")
+with col_pr: produto = st.text_input("📦 Produto a ser filtrado")
+
+col_opp, col_resp, col_vazio = st.columns(3)
+with col_opp: n_opp = st.text_input("🔢 Nº OPP")
+with col_resp: responsavel = st.text_input("👨‍💻 Responsável pelo projeto")
+
+st.markdown("---")
 
 # --- SIDEBAR: ENTRADA DE DADOS ---
 st.sidebar.header("🚀 Capacidade e Operação")
-solidos_dia = st.sidebar.number_input("Peso Total Sólidos Secos (ton/dia)", value=100.0)
+solidos_dia = st.sidebar.number_input("Peso Total Sólidos Secos (ton/dia)", value=100.0, step=1.0)
+horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", value=20.0, step=0.5)
+tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60, step=1)
 
-# NOVO CAMPO: VOLUME DE POLPA POR DIA
-vol_polpa_dia = st.sidebar.number_input("Volume de Lodo/Polpa por dia (m³/dia)", value=500.0)
-
-horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", value=20.0)
-tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60)
-
+# SEÇÃO CONSOLIDADA: FLUXO DE POLPA
 st.sidebar.header("💧 Fluxo de Polpa")
-vazao_lh = st.sidebar.number_input("Vazão de Alimentação de Polpa (L/h)", value=50000.0)
+vol_polpa_dia = st.sidebar.number_input("Volume de Lodo/Polpa por dia (m³/dia)", value=500.0, step=10.0)
+vazao_lh = st.sidebar.number_input("Vazão de Alimentação de Polpa (L/h)", value=50000.0, step=1000.0)
 
 st.sidebar.header("🧪 Propriedades Físicas")
-sg_solidos = st.sidebar.number_input("Gravidade Específica (Sólidos)", value=2.8)
-umidade_input = st.sidebar.number_input("Umidade Final da Torta (%)", value=20.0)
+sg_solidos = st.sidebar.number_input("Gravidade Específica (Sólidos Secos)", value=2.8, step=0.1)
+umidade_input = st.sidebar.number_input("Umidade Final da Torta (%)", value=20.0, step=0.5)
 umidade = umidade_input / 100
 
-st.sidebar.header("📐 Geometria")
-recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", value=30.0)
+st.sidebar.header("📝 Detalhes Técnicos")
+temp_processo = st.sidebar.number_input("Temperatura (°C)", value=25)
+ph_solucao = st.sidebar.number_input("pH da Solução", value=7.0, step=0.1)
+lavador_lonas = st.sidebar.selectbox("Lavador de Lonas?", ["Sim", "Não"])
+aut_nivel = st.sidebar.selectbox("Nível de Automatização", ["Baixo", "Médio", "Alto"])
+lavador_torta = st.sidebar.selectbox("Lavador de Torta?", ["Sim", "Não"])
+membrana = st.sidebar.selectbox("Membrana de Compressão?", ["Sim", "Não"])
+
+st.sidebar.header("📐 Geometria da Placa")
+recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", value=30.0, step=1.0)
 
 # --- BASE DE DADOS TÉCNICA ---
 tamanhos = [
@@ -57,45 +71,47 @@ tamanhos = [
 ]
 
 # --- LÓGICA DE CÁLCULO ---
-ciclos_dia = (horas_op * 60) / tempo_cycle
-massa_seco_ciclo = solidos_dia / ciclos_dia
-vol_polpa_ciclo_L = (vol_polpa_dia / ciclos_dia) * 1000
+ciclos_dia = (horas_op * 60) / tempo_cycle if tempo_cycle > 0 else 0
+massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
+vol_polpa_ciclo_L = (vol_polpa_dia / ciclos_dia) * 1000 if ciclos_dia > 0 else 0
 
-# Cálculo do volume de torta (Espaço ocupado nas câmaras)
-dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0))
-vol_torta_m3 = (massa_seco_ciclo / (1 - umidade)) / dens_torta
-vol_total_L_requerido = vol_torta_m3 * 1000
+# Densidade da torta
+dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
+vol_torta_m3 = (massa_seco_ciclo / (1 - umidade)) / dens_torta if (1-umidade) > 0 else 0
+vol_total_L_req = vol_torta_m3 * 1000
 
-# --- EXIBIÇÃO ---
+# --- EXIBIÇÃO DE MÉTRICAS ---
+st.subheader(f"Resumo Técnico: {produto if produto else 'Geral'}")
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Vol. Polpa p/ Ciclo", f"{vol_polpa_ciclo_L:,.0f} L")
-col2.metric("Vol. Torta p/ Ciclo", f"{vol_total_L_requerido:.0f} L")
+col2.metric("Vol. Torta p/ Ciclo", f"{vol_total_L_req:,.0f} L")
 col3.metric("Massa Seca p/ Ciclo", f"{massa_seco_ciclo:.2f} t")
-col4.metric("Conc. Sólidos Calc.", f"{(solidos_dia/vol_polpa_dia)*100:.1f} %")
+col4.metric("Conc. Sólidos Calc.", f"{(solidos_dia/vol_polpa_dia)*100:.1f} %" if vol_polpa_dia > 0 else "0%")
 
-st.subheader("📋 Dimensionamento e Verificação de Processo")
+st.subheader("📋 Opções de Dimensionamento")
 
 res_list = []
 for p in tamanhos:
     vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
-    num_placas = math.ceil(vol_total_L_requerido / vol_ajustado)
+    num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
     area_total = num_placas * p["area_ref"]
-    fluxo = vazao_lh / area_total
+    fluxo = vazao_lh / area_total if area_total > 0 else 0
     
     status = "✅ OK"
     obs = "-"
     
-    # Validação de Volume: Polpa vs Torta
-    # Se o volume da torta for quase igual ao da polpa, o ciclo é muito curto ou lodo muito denso
-    if vol_total_L_requerido > vol_polpa_ciclo_L:
+    if vol_total_L_req > vol_polpa_ciclo_L:
         status = "❌ Erro Dados"
-        obs = "Vol. de Torta calculado maior que Vol. de Polpa alimentado."
+        obs = "Volume de torta calculado é maior que o volume de polpa fornecido."
     elif fluxo > 500:
         status = "⚠️ Fluxo Alto"
-        obs = f"Fluxo de {fluxo:.0f} L/m²h acima do ideal."
+        obs = f"Taxa de {fluxo:.0f} L/m²h acima do recomendado."
     elif p["nom"] == 1500 and num_placas > 120:
         status = "⚠️ Dividir"
-        obs = f"Limite de 120 placas. Sugerido dividir."
+        obs = "Limite de 120 placas excedido para 1500mm."
+    elif num_placas > p["max"]:
+        status = "❌ Excedeu Limite"
+        obs = f"Máximo {p['max']} placas."
     
     res_list.append({
         "Modelo (mm)": f"{p['nom']} x {p['nom']}",
