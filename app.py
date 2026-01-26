@@ -1,6 +1,9 @@
 import streamlit as st
 import math
 import os
+from fpdf import FPDF  # Biblioteca para gerar o PDFimport streamlit as st
+import math
+import os
 
 # Configuração da página
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
