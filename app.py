@@ -93,3 +93,75 @@ tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60
 st.sidebar.header("💧 Fluxo de Polpa")
 vol_polpa_dia = st.sidebar.number_input("Volume Lodo/Polpa (m³/dia)", value=500.0)
 vazao_lh = st.sidebar.number_input("Vazao de Alimentacao (L/h)", value=50000.0)
+
+st.sidebar.header("🧪 Propriedades Fisicas")
+sg_solidos = st.sidebar.number_input("Gravidade Especifica", value=2.8)
+umidade_input = st.sidebar.number_input("Umidade Final Torta (%)", value=20.0)
+recesso_manual = st.sidebar.number_input("Espessura de camara (mm)", value=30.0)
+umidade = umidade_input / 100
+
+# ---------------------------------------------------------
+# LÓGICA DE CÁLCULO
+# ---------------------------------------------------------
+tamanhos = [
+    {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
+    {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
+    {"nom": 1500, "area_ref": 4.50, "vol_ref": 70,  "max": 120},
+    {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100},
+]
+
+ciclos_dia = (horas_op * 60) / tempo_cycle if tempo_cycle > 0 else 0
+massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
+dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
+vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
+
+# ---------------------------------------------------------
+# TABELAS DE RESULTADOS
+# ---------------------------------------------------------
+st.subheader("📋 Opcoes de Dimensionamento (Filtro Unico)")
+res_list = []
+for p in tamanhos:
+    vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
+    num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
+    area_total = num_placas * p["area_ref"]
+    fluxo = vazao_lh / area_total if area_total > 0 else 0
+    
+    res_list.append({
+        "Modelo (mm)": f"{p['nom']} x {p['nom']}",
+        "Placas": num_placas,
+        "Área Total (m²)": f"{area_total:.2f}",
+        "Fluxo (L/m²h)": f"{fluxo:.1f}",
+        "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
+    })
+st.table(res_list)
+
+st.subheader("🔄 Alternativas em Paralelo (Redundancia)")
+multi_list = []
+for nom_alvo in [2000, 1500]:
+    p_ref = next(item for item in tamanhos if item["nom"] == nom_alvo)
+    placas_por_filtro = math.ceil((vol_total_L_req / 2) / (p_ref["vol_ref"] * (recesso_manual / 30)))
+    multi_list.append({
+        "Configuracao": f"2x Filtros {nom_alvo} mm",
+        "Placas/Filtro": placas_por_filtro,
+        "Status": "✅ Recomendado" if placas_por_filtro <= p_ref["max"] else "⚠️ Limite Alto"
+    })
+st.table(multi_list)
+
+# ---------------------------------------------------------
+# FINALIZAÇÃO E BOTÃO PDF
+# ---------------------------------------------------------
+st.markdown("---")
+if cliente and n_opp:
+    pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, res_list, multi_list)
+    
+    if isinstance(pdf_bytes, bytes):
+        st.download_button(
+            label="📄 Gerar Estudo Tecnico em PDF",
+            data=pdf_bytes,
+            file_name=f"Cleanova_Micronics_{cliente}_{n_opp}.pdf",
+            mime="application/pdf"
+        )
+    else:
+        st.error(pdf_bytes)
+else:
+    st.info("💡 Insira o **Nome do Cliente** e o **Nº OPP** para habilitar o download do PDF.")
