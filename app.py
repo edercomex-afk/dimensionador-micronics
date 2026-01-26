@@ -2,7 +2,7 @@ import streamlit as st
 import math
 
 # Configuração da página
-st.set_page_config(page_title="Dimensionamento Micronics V11", layout="wide")
+st.set_page_config(page_title="Dimensionamento Micronics V12", layout="wide")
 
 st.title("🛠️ Dimensionador de Filtro Prensa - Micronics")
 
@@ -39,29 +39,16 @@ membrana = st.sidebar.selectbox("Membrana de Compressão?", ["Sim", "Não"])
 st.sidebar.header("📐 Geometria da Placa")
 recesso_manual = st.sidebar.number_input("Espessura de câmara (mm)", min_value=1.0, max_value=100.0, value=30.0, step=1.0)
 
-# --- NOVA CAIXA DE FORNECEDORES (OCULTA NA TABELA) ---
-st.sidebar.header("🏢 Cadeia de Suprimentos")
-escolha_forn = st.sidebar.selectbox("Consultar Fornecedores por Tamanho:", 
-    ["Selecionar...", "2500 x 2500", "2000 x 2000", "Menores (1500 a 400)"])
-
-# --- LÓGICA DE EXIBIÇÃO DE FORNECEDORES ---
-if escolha_forn == "2500 x 2500":
-    st.sidebar.info("🚛 **Fornecedores:** Dewatering, Jing Jin e Bright")
-elif escolha_forn == "2000 x 2000":
-    st.sidebar.info("🚛 **Fornecedores:** Micronics, Dewatering, Jing Jin e Bright")
-elif escolha_forn == "Menores (1500 a 400)":
-    st.sidebar.info("🚛 **Fornecedores:** Micronics, Dewatering, Jing Jin, Bright e Fugie")
-
 # --- BASE DE DADOS TÉCNICA ---
 tamanhos = [
-    {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
-    {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
-    {"nom": 1500, "area_ref": 4.50, "vol_ref": 70,  "max": 120},
-    {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100},
-    {"nom": 1000, "area_ref": 1.80, "vol_ref": 25,  "max": 100},
-    {"nom": 800,  "area_ref": 1.10, "vol_ref": 15,  "max": 84},
-    {"nom": 630,  "area_ref": 0.65, "vol_ref": 9,   "max": 74},
-    {"nom": 400,  "area_ref": 0.25, "vol_ref": 3,   "max": 74},
+    {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190, "forn": "Dewatering, Jing Jin, Bright"},
+    {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160, "forn": "Micronics, Dewatering, Jing Jin, Bright"},
+    {"nom": 1500, "area_ref": 4.50, "vol_ref": 70,  "max": 120, "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100, "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 1000, "area_ref": 1.80, "vol_ref": 25,  "max": 100, "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 800,  "area_ref": 1.10, "vol_ref": 15,  "max": 84,  "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 630,  "area_ref": 0.65, "vol_ref": 9,   "max": 74,  "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
+    {"nom": 400,  "area_ref": 0.25, "vol_ref": 3,   "max": 74,  "forn": "Micronics, Dewatering, Jing Jin, Bright, Fugie"},
 ]
 
 # --- LÓGICA DE CÁLCULO ---
@@ -78,7 +65,7 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("Massa Seca Total", f"{solidos_dia:.1f} t/dia")
 col2.metric("Massa p/ Ciclo", f"{massa_seco_ciclo:.2f} t")
 col3.metric("Vol. Torta p/ Ciclo", f"{vol_total_L:.0f} L")
-col4.metric("Espessura Câmara", f"{recesso_manual} mm")
+col4.metric("Ciclos p/ Dia", f"{ciclos_dia:.1f}")
 
 with st.expander("📋 Ver Detalhes do Projeto e Opcionais"):
     c1, c2, c3 = st.columns(3)
@@ -89,10 +76,4 @@ with st.expander("📋 Ver Detalhes do Projeto e Opcionais"):
     c3.write(f"**Automação:** {aut_nivel} | **Lavador Torta:** {lavador_torta}")
     c3.write(f"**Membrana:** {membrana}")
 
-st.subheader("📋 Opções de Dimensionamento Sugeridas")
-
-res_list = []
-for p in tamanhos:
-    vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
-    num_placas = math.ceil(vol_total_L / vol_ajustado) if vol_ajustado > 0 else 0
-    area_total = num_placas * p["area_ref"]
+st.subheader("📋 Opções de Dimension
