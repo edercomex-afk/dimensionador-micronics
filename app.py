@@ -3,47 +3,43 @@ import math
 import os
 from fpdf import FPDF
 
-# 1. Configuração da página (Deve ser a primeira linha Streamlit)
+# 1. Configuração da página
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (CORRIGIDA PARA CARACTERES ESPECIAIS)
+# FUNÇÃO PARA GERAR PDF (INCLUINDO DADOS INFORMATIVOS)
 # ---------------------------------------------------------
-def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, res_unicos, res_multi):
+def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos):
     try:
         pdf = FPDF()
         pdf.add_page()
-        
-        # Título do Relatório
         pdf.set_font("Arial", "B", 16)
         pdf.cell(190, 10, "Estudo Tecnico de Dimensionamento - Cleanova Micronics", ln=True, align="C")
-        pdf.ln(10)
+        pdf.ln(5)
         
-        # Informações do Projeto (Limpando caracteres incompatíveis com latin-1)
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(95, 8, f"Cliente: {cliente}".encode('latin-1', 'ignore').decode('latin-1'), 0)
-        pdf.cell(95, 8, f"Mercado: {mercado}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
-        pdf.cell(95, 8, f"Projeto: {projeto}".encode('latin-1', 'ignore').decode('latin-1'), 0)
-        pdf.cell(95, 8, f"Produto: {produto}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
-        pdf.cell(95, 8, f"Nº OPP: {opp}".encode('latin-1', 'ignore').decode('latin-1'), 0)
-        pdf.cell(95, 8, f"Responsavel: {resp}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
-        pdf.ln(10)
+        # Dados de Identificação
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(95, 7, f"Cliente: {cliente}".encode('latin-1', 'ignore').decode('latin-1'), 0)
+        pdf.cell(95, 7, f"Mercado: {mercado}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
+        pdf.cell(95, 7, f"Projeto: {projeto}".encode('latin-1', 'ignore').decode('latin-1'), 0)
+        pdf.cell(95, 7, f"N. OPP: {opp}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
+        pdf.ln(5)
+
+        # Dados Informativos (Temp, pH, etc)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(190, 7, "Especificacoes de Processo:", ln=True)
+        pdf.set_font("Arial", "", 9)
+        info_txt = f"Produto: {produto} | Temp: {dados_tec['temp']}C | pH: {dados_tec['ph']} | Lavagem Lona: {dados_tec['lav_l']} | Lavagem Torta: {dados_tec['lav_t']} | Membrana: {dados_tec['mem']}"
+        pdf.multi_cell(190, 7, info_txt.encode('latin-1', 'ignore').decode('latin-1'), border=1)
+        pdf.ln(5)
         
-        # Tabela 1: Filtro Único
-        pdf.set_font("Arial", "B", 11)
-        pdf.cell(190, 10, "Opcoes de Filtro Unico:", ln=True)
-        pdf.set_font("Arial", "B", 9)
-        pdf.cell(50, 10, "Modelo", 1)
-        pdf.cell(30, 10, "Placas", 1)
-        pdf.cell(40, 10, "Area (m2)", 1)
-        pdf.cell(40, 10, "Fluxo (L/m2h)", 1)
-        pdf.cell(30, 10, "Status", 1, ln=True)
+        # Tabela de Resultados
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(50, 10, "Modelo", 1); pdf.cell(30, 10, "Placas", 1); pdf.cell(40, 10, "Area (m2)", 1); pdf.cell(40, 10, "Fluxo (L/m2h)", 1); pdf.cell(30, 10, "Status", 1, ln=True)
         
         pdf.set_font("Arial", "", 9)
         for r in res_unicos:
-            # Remove emojis para evitar erro no PDF
             status_limpo = r["Status"].replace("✅", "").replace("❌", "").replace("⚠️", "").strip()
-            
             pdf.cell(50, 10, r["Modelo (mm)"], 1)
             pdf.cell(30, 10, str(r["Placas"]), 1)
             pdf.cell(40, 10, r["Área Total (m²)"], 1)
@@ -59,50 +55,60 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, res_unicos, 
 # ---------------------------------------------------------
 logo_url = "https://www.cleanova.com/wp-content/uploads/2023/10/Cleanova_Logo_Main_RGB.png"
 col_l, col_t = st.columns([1, 3])
-with col_l: 
-    st.image(logo_url, width=300)
-with col_t: 
-    st.title("Dimensionador de Filtro Prensa")
+with col_l: st.image(logo_url, width=280)
+with col_t: st.title("Dimensionador de Filtro Prensa")
 
 st.sidebar.image(logo_url, use_container_width=True)
 st.markdown("---")
 
 # ---------------------------------------------------------
-# CABEÇALHO DE IDENTIFICAÇÃO
+# CABEÇALHO (IDENTIFICAÇÃO)
 # ---------------------------------------------------------
-row1_c1, row1_c2, row1_c3 = st.columns(3)
-with row1_c1: cliente = st.text_input("👤 Nome do Cliente")
-with row1_c2: projeto = st.text_input("📂 Nome do Projeto")
-with row1_c3: mercado = st.text_input("🏭 Mercado (Ex: Mineracao)")
+r1_c1, r1_c2, r1_c3 = st.columns(3)
+with r1_c1: cliente = st.text_input("👤 Nome do Cliente")
+with r1_c2: projeto = st.text_input("📂 Nome do Projeto")
+with r1_c3: mercado = st.text_input("🏭 Mercado")
 
-row2_c1, row2_c2, row2_c3 = st.columns(3)
-with row2_c1: produto = st.text_input("📦 Produto")
-with row2_c2: n_opp = st.text_input("🔢 Nº OPP")
-with row2_c3: responsavel = st.text_input("👨‍💻 Responsavel")
+r2_c1, r2_c2, r2_c3 = st.columns(3)
+with r2_c1: produto = st.text_input("📦 Produto")
+with r2_c2: n_opp = st.text_input("🔢 Nº OPP")
+with r2_c3: responsavel = st.text_input("👨‍💻 Responsável")
 
 st.markdown("---")
 
 # ---------------------------------------------------------
-# SIDEBAR: DADOS TÉCNICOS
+# SIDEBAR: DADOS TÉCNICOS E INFORMATIVOS
 # ---------------------------------------------------------
-st.sidebar.header("🚀 Capacidade e Operacao")
-solidos_dia = st.sidebar.number_input("Peso Solidos Secos (ton/dia)", value=100.0)
-horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", value=20.0)
-tempo_cycle = st.sidebar.number_input("Tempo de ciclo total (minutos)", value=60)
+st.sidebar.header("🚀 Capacidade")
+solidos_dia = st.sidebar.number_input("Peso Seco (ton/dia)", value=100.0)
+horas_op = st.sidebar.number_input("Horas/dia", value=20.0)
+tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=60)
 
 st.sidebar.header("💧 Fluxo de Polpa")
-vol_polpa_dia = st.sidebar.number_input("Volume Lodo/Polpa (m³/dia)", value=500.0)
-vazao_lh = st.sidebar.number_input("Vazao de Alimentacao (L/h)", value=50000.0)
+vol_polpa_dia = st.sidebar.number_input("Volume Polpa (m³/dia)", value=500.0)
+vazao_lh = st.sidebar.number_input("Vazão Alimentação (L/h)", value=50000.0)
 
-st.sidebar.header("🧪 Propriedades Fisicas")
-sg_solidos = st.sidebar.number_input("Gravidade Especifica", value=2.8)
-umidade_input = st.sidebar.number_input("Umidade Final Torta (%)", value=20.0)
-recesso_manual = st.sidebar.number_input("Espessura de camara (mm)", value=30.0)
-umidade = umidade_input / 100
+st.sidebar.header("📝 Dados Informativos")
+temp_processo = st.sidebar.number_input("Temperatura (°C)", value=25)
+ph_solucao = st.sidebar.number_input("pH", value=7.0)
+lav_lona = st.sidebar.selectbox("Lavagem de Lona?", ["Sim", "Não"])
+lav_torta = st.sidebar.selectbox("Lavagem de Torta?", ["Sim", "Não"])
+membrana = st.sidebar.selectbox("Membrana?", ["Sim", "Não"])
+
+st.sidebar.header("🧪 Propriedades")
+sg_solidos = st.sidebar.number_input("SG Sólidos", value=2.8)
+umidade_input = st.sidebar.number_input("Umidade Torta (%)", value=20.0)
+recesso = st.sidebar.number_input("Espessura câmara (mm)", value=30.0)
 
 # ---------------------------------------------------------
 # LÓGICA DE CÁLCULO
 # ---------------------------------------------------------
+umidade = umidade_input / 100
+ciclos_dia = (horas_op * 60) / tempo_cycle if tempo_cycle > 0 else 0
+massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
+dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
+vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
+
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -110,58 +116,38 @@ tamanhos = [
     {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100},
 ]
 
-ciclos_dia = (horas_op * 60) / tempo_cycle if tempo_cycle > 0 else 0
-massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
-dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
-vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
-
 # ---------------------------------------------------------
-# TABELAS DE RESULTADOS
+# TABELAS E RESULTADOS
 # ---------------------------------------------------------
-st.subheader("📋 Opcoes de Dimensionamento (Filtro Unico)")
+st.subheader("📋 Dimensionamento Final")
 res_list = []
 for p in tamanhos:
-    vol_ajustado = p["vol_ref"] * (recesso_manual / 30)
+    vol_ajustado = p["vol_ref"] * (recesso / 30)
     num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
-    area_total = num_placas * p["area_ref"]
-    fluxo = vazao_lh / area_total if area_total > 0 else 0
-    
+    area_t = num_placas * p["area_ref"]
+    fluxo = vazao_lh / area_t if area_t > 0 else 0
     res_list.append({
         "Modelo (mm)": f"{p['nom']} x {p['nom']}",
         "Placas": num_placas,
-        "Área Total (m²)": f"{area_total:.2f}",
+        "Área Total (m²)": f"{area_t:.2f}",
         "Fluxo (L/m²h)": f"{fluxo:.1f}",
         "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
     })
 st.table(res_list)
 
-st.subheader("🔄 Alternativas em Paralelo (Redundancia)")
-multi_list = []
-for nom_alvo in [2000, 1500]:
-    p_ref = next(item for item in tamanhos if item["nom"] == nom_alvo)
-    placas_por_filtro = math.ceil((vol_total_L_req / 2) / (p_ref["vol_ref"] * (recesso_manual / 30)))
-    multi_list.append({
-        "Configuracao": f"2x Filtros {nom_alvo} mm",
-        "Placas/Filtro": placas_por_filtro,
-        "Status": "✅ Recomendado" if placas_por_filtro <= p_ref["max"] else "⚠️ Limite Alto"
-    })
-st.table(multi_list)
-
 # ---------------------------------------------------------
-# FINALIZAÇÃO E BOTÃO PDF
+# EXPORTAÇÃO PDF
 # ---------------------------------------------------------
 st.markdown("---")
 if cliente and n_opp:
-    pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, res_list, multi_list)
+    dados_tec = {
+        "temp": temp_processo, "ph": ph_solucao, 
+        "lav_l": lav_lona, "lav_t": lav_torta, "mem": membrana
+    }
+    pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, dados_tec, res_list)
     
     if isinstance(pdf_bytes, bytes):
-        st.download_button(
-            label="📄 Gerar Estudo Tecnico em PDF",
-            data=pdf_bytes,
-            file_name=f"Cleanova_Micronics_{cliente}_{n_opp}.pdf",
-            mime="application/pdf"
-        )
-    else:
-        st.error(pdf_bytes)
+        st.download_button(label="📄 Baixar Estudo em PDF", data=pdf_bytes, 
+                           file_name=f"Cleanova_{cliente}_{n_opp}.pdf", mime="application/pdf")
 else:
-    st.info("💡 Insira o **Nome do Cliente** e o **Nº OPP** para habilitar o download do PDF.")
+    st.info("💡 Informe o Cliente e OPP para gerar o PDF.")
