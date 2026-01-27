@@ -84,13 +84,20 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
 # ---------------------------------------------------------
 # LAYOUT PRINCIPAL (STREAMLIT)
 # ---------------------------------------------------------
-logo_url = "https://www.cleanova.com/wp-content/uploads/2023/10/Cleanova_Logo_Main_RGB.png"
-col_l, col_t = st.columns([1, 3])
-with col_l: st.image(logo_url, width=280)
-with col_t: st.title("Dimensionador de Filtro Prensa")
+# --- LÓGICA DO LOGOTIPO (VERSÃO ESTABILIZADA) ---
+# Tente usar este link direto que é mais leve e compatível
+logo_url = "https://raw.githubusercontent.com/cleanova-branding/assets/main/logo.png" 
 
-st.sidebar.image(logo_url, use_container_width=True)
-st.markdown("---")
+# Caso o link acima falhe, o Streamlit exibirá apenas o título para não travar o app
+try:
+    col_l, col_t = st.columns([1, 3])
+    with col_l: 
+        st.image(logo_url, width=280)
+    with col_t: 
+        st.title("Dimensionador de Filtro Prensa")
+    st.sidebar.image(logo_url, use_container_width=True)
+except:
+    st.title("Cleanova Micronics | Dimensionador")
 
 # IDENTIFICAÇÃO
 r1_c1, r1_c2, r1_c3 = st.columns(3)
