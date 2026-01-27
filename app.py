@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (ATUALIZADA)
+# FUNÇÃO PARA GERAR PDF
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis):
     try:
@@ -61,17 +61,14 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
             pdf.cell(45, 10, r["Dry Solids Load"], 1)
             pdf.cell(25, 10, status_limpo, 1, ln=True)
             
-        # Validação e Assinaturas
+        # Assinaturas
         pdf.ln(20)
         data_atual = datetime.now().strftime("%d/%m/%Y")
         pdf.set_font("Arial", "I", 9)
         pdf.cell(190, 10, f"Documento gerado em: {data_atual}", ln=True, align="R")
         pdf.ln(15)
-        
-        y_atual = pdf.get_y()
-        pdf.line(10, y_atual, 90, y_atual)
-        pdf.line(110, y_atual, 190, y_atual)
-        
+        pdf.line(10, pdf.get_y(), 90, pdf.get_y())
+        pdf.line(110, pdf.get_y(), 190, pdf.get_y())
         pdf.ln(2)
         pdf.set_font("Arial", "B", 9)
         pdf.cell(80, 5, "Elaborado (Responsavel)", 0, align="C")
@@ -103,7 +100,8 @@ st.markdown("---")
 
 # SIDEBAR DADOS
 st.sidebar.header("🚀 Capacidade")
-solidos_dia = st.sidebar.number_input("Peso Seco (ton/dia)", value=100.0)
+# NOME ALTERADO CONFORME SOLICITAÇÃO
+solidos_dia = st.sidebar.number_input("Sólidos secos/dia (ton/dia)", value=100.0)
 utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 80)
 tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=60)
 
@@ -116,7 +114,6 @@ membrana = st.sidebar.selectbox("Membrana?", ["Sim", "Não"])
 
 st.sidebar.header("🧪 Propriedades Técnicas")
 vazao_lh = st.sidebar.number_input("Vazão de Alimentação (L/h)", value=50000.0)
-# NOME ALTERADO CONFORME SOLICITAÇÃO
 sg_solidos = st.sidebar.number_input("Gravidade específica dos sólidos secos", value=2.8)
 umidade_input = st.sidebar.number_input("Umidade Torta (%)", value=20.0)
 recesso = st.sidebar.number_input("Espessura câmara (mm)", value=30.0)
