@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF
+# FUNÇÃO PARA GERAR PDF (ATUALIZADA)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis):
     try:
@@ -35,7 +35,9 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.cell(190, 7, "Indicadores de Performance Requeridos:", ln=True)
         pdf.set_font("Arial", "", 9)
         pdf.cell(95, 7, f"Peso Total de Torta: {kpis['peso_torta_dia']:.2f} ton/dia", 1)
-        pdf.cell(95, 7, f"Disponibilidade: {kpis['disp_pct']}% ({kpis['disp_h']:.1f} h/dia)", 1, ln=True)
+        pdf.cell(95, 7, f"Volume Lodo Diario: {kpis['vol_lodo_dia']:.2f} m3/dia", 1, ln=True)
+        pdf.cell(95, 7, f"Disponibilidade: {kpis['disp_pct']}% ({kpis['disp_h']:.1f} h/dia)", 1)
+        pdf.cell(95, 7, f"Conc. Solidos Alimentacao: {kpis['conc_sol']:.2f} %", 1, ln=True)
         pdf.ln(5)
 
         # Dados Informativos
@@ -100,7 +102,6 @@ st.markdown("---")
 
 # SIDEBAR DADOS
 st.sidebar.header("🚀 Capacidade")
-# NOME ALTERADO CONFORME SOLICITAÇÃO
 solidos_dia = st.sidebar.number_input("Sólidos secos/dia (ton/dia)", value=100.0)
 utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 80)
 tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=60)
@@ -114,6 +115,8 @@ membrana = st.sidebar.selectbox("Membrana?", ["Sim", "Não"])
 
 st.sidebar.header("🧪 Propriedades Técnicas")
 vazao_lh = st.sidebar.number_input("Vazão de Alimentação (L/h)", value=50000.0)
+# NOVO CAMPO ADICIONADO ABAIXO
+vol_lodo_dia = st.sidebar.number_input("Volume de lodo/polpa por dia (m³/dia)", value=500.0)
 sg_solidos = st.sidebar.number_input("Gravidade específica dos sólidos secos", value=2.8)
 umidade_input = st.sidebar.number_input("Umidade Torta (%)", value=20.0)
 recesso = st.sidebar.number_input("Espessura câmara (mm)", value=30.0)
@@ -123,6 +126,9 @@ umidade = umidade_input / 100
 disp_horas = 24 * (utilizacao_pct / 100)
 ciclos_dia = (disp_horas * 60) / tempo_cycle if tempo_cycle > 0 else 0
 
+# Concentração de sólidos calculada (Peso Sólidos / Volume Lodo)
+conc_solidos_calc = (solidos_dia / vol_lodo_dia) * 100 if vol_lodo_dia > 0 else 0
+
 peso_torta_dia = solidos_dia / (1 - umidade) if (1-umidade) > 0 else 0
 massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
 
@@ -130,10 +136,11 @@ dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos 
 vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
 
 # MÉTRICAS RÁPIDAS NO TOPO
-k1, k2, k3 = st.columns(3)
+k1, k2, k3, k4 = st.columns(4)
 k1.metric("Peso Torta Total", f"{peso_torta_dia:.2f} t/dia")
 k2.metric("Disponibilidade", f"{disp_horas:.1f} h/dia")
 k3.metric("Ciclos por dia", f"{ciclos_dia:.1f}")
+k4.metric("Conc. Sólidos", f"{conc_solidos_calc:.1f} %")
 
 # RESULTADOS
 st.subheader("📋 Resultados do Dimensionamento")
@@ -167,7 +174,13 @@ st.table(res_list)
 st.markdown("---")
 if cliente and n_opp and responsavel:
     dados_tec = {"temp": temp_proc, "ph": ph_sol, "lav_l": lav_lona, "lav_t": lav_torta, "mem": membrana}
-    kpis_pdf = {"peso_torta_dia": peso_torta_dia, "disp_pct": utilizacao_pct, "disp_h": disp_horas}
+    kpis_pdf = {
+        "peso_torta_dia": peso_torta_dia, 
+        "disp_pct": utilizacao_pct, 
+        "disp_h": disp_horas,
+        "vol_lodo_dia": vol_lodo_dia,
+        "conc_sol": conc_solidos_calc
+    }
     
     pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, dados_tec, res_list, kpis_pdf)
     
