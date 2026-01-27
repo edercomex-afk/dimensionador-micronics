@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (ATUALIZADA COM KPIs DE ENGENHARIA)
+# FUNÇÃO PARA GERAR PDF (ATUALIZADA)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis):
     try:
@@ -30,7 +30,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.cell(190, 7, f"Responsavel pelo Projeto: {resp}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
         pdf.ln(5)
 
-        # Resumo de Performance (Novo)
+        # Resumo de Performance
         pdf.set_font("Arial", "B", 10)
         pdf.cell(190, 7, "Indicadores de Performance Requeridos:", ln=True)
         pdf.set_font("Arial", "", 9)
@@ -46,7 +46,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.multi_cell(190, 7, info_txt.encode('latin-1', 'ignore').decode('latin-1'), border=1)
         pdf.ln(8)
         
-        # Tabela de Resultados (Com Dry Solids Load)
+        # Tabela de Resultados
         pdf.set_font("Arial", "B", 9)
         pdf.cell(40, 10, "Modelo", 1); pdf.cell(20, 10, "Placas", 1); pdf.cell(30, 10, "Area (m2)", 1); 
         pdf.cell(30, 10, "Fluxo (L/m2h)", 1); pdf.cell(45, 10, "Dry Solids (kg/m2/d)", 1); pdf.cell(25, 10, "Status", 1, ln=True)
@@ -88,7 +88,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
 st.title("Cleanova Micronics | Dimensionador de Filtro Prensa")
 st.markdown("---")
 
-# IDENTIFICAÇÃO (Sequência original preservada)
+# IDENTIFICAÇÃO
 col1, col2, col3 = st.columns(3)
 with col1: cliente = st.text_input("👤 Nome do Cliente")
 with col2: projeto = st.text_input("📂 Nome do Projeto")
@@ -101,7 +101,7 @@ with col6: responsavel = st.text_input("👨‍💻 Responsável pelo Projeto")
 
 st.markdown("---")
 
-# SIDEBAR DADOS (Disponibilidade em % adicionada)
+# SIDEBAR DADOS
 st.sidebar.header("🚀 Capacidade")
 solidos_dia = st.sidebar.number_input("Peso Seco (ton/dia)", value=100.0)
 utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 80)
@@ -116,7 +116,8 @@ membrana = st.sidebar.selectbox("Membrana?", ["Sim", "Não"])
 
 st.sidebar.header("🧪 Propriedades Técnicas")
 vazao_lh = st.sidebar.number_input("Vazão de Alimentação (L/h)", value=50000.0)
-sg_solidos = st.sidebar.number_input("SG Sólidos", value=2.8)
+# NOME ALTERADO CONFORME SOLICITAÇÃO
+sg_solidos = st.sidebar.number_input("Gravidade específica dos sólidos secos", value=2.8)
 umidade_input = st.sidebar.number_input("Umidade Torta (%)", value=20.0)
 recesso = st.sidebar.number_input("Espessura câmara (mm)", value=30.0)
 
@@ -140,7 +141,6 @@ k3.metric("Ciclos por dia", f"{ciclos_dia:.1f}")
 # RESULTADOS
 st.subheader("📋 Resultados do Dimensionamento")
 
-
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -154,8 +154,6 @@ for p in tamanhos:
     num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
     area_t = num_placas * p["area_ref"]
     fluxo = vazao_lh / area_t if area_t > 0 else 0
-    
-    # KPI: Dry Solids per Unit Area per Day (kg/m2/day)
     dry_solids_load = (solidos_dia * 1000) / area_t if area_t > 0 else 0
     
     res_list.append({
