@@ -1,6 +1,5 @@
 import streamlit as st
 import math
-import os
 from fpdf import FPDF
 from datetime import datetime
 
@@ -8,30 +7,30 @@ from datetime import datetime
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (VERSÃO COM ASSINATURAS E RESPONSÁVEL)
+# FUNÇÃO PARA GERAR PDF (LIMPA E COM ASSINATURAS)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos):
     try:
         pdf = FPDF()
         pdf.add_page()
         
-        # Cabeçalho do Relatório
+        # Título do Relatório
         pdf.set_font("Arial", "B", 16)
-        pdf.cell(190, 10, "Estudo Tecnico de Dimensionamento - Cleanova Micronics", ln=True, align="C")
+        pdf.cell(190, 10, "ESTUDO TECNICO DE DIMENSIONAMENTO", ln=True, align="C")
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(190, 10, "CLEANOVA MICRONICS", ln=True, align="C")
         pdf.ln(5)
         
         # Dados de Identificação
         pdf.set_font("Arial", "B", 10)
-        # Limpeza de caracteres incompatíveis com latin-1
         pdf.cell(95, 7, f"Cliente: {cliente}".encode('latin-1', 'ignore').decode('latin-1'), 0)
         pdf.cell(95, 7, f"Mercado: {mercado}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
         pdf.cell(95, 7, f"Projeto: {projeto}".encode('latin-1', 'ignore').decode('latin-1'), 0)
         pdf.cell(95, 7, f"N. OPP: {opp}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
-        # Campo Responsável Corrigido
         pdf.cell(190, 7, f"Responsavel pelo Projeto: {resp}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
         pdf.ln(5)
 
-        # Dados Informativos (Temp, pH, etc)
+        # Dados Informativos
         pdf.set_font("Arial", "B", 10)
         pdf.cell(190, 7, "Especificacoes de Processo:", ln=True)
         pdf.set_font("Arial", "", 9)
@@ -41,11 +40,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         
         # Tabela de Resultados
         pdf.set_font("Arial", "B", 10)
-        pdf.cell(50, 10, "Modelo", 1)
-        pdf.cell(30, 10, "Placas", 1)
-        pdf.cell(40, 10, "Area (m2)", 1)
-        pdf.cell(40, 10, "Fluxo (L/m2h)", 1)
-        pdf.cell(30, 10, "Status", 1, ln=True)
+        pdf.cell(50, 10, "Modelo", 1); pdf.cell(30, 10, "Placas", 1); pdf.cell(40, 10, "Area (m2)", 1); pdf.cell(40, 10, "Fluxo (L/m2h)", 1); pdf.cell(30, 10, "Status", 1, ln=True)
         
         pdf.set_font("Arial", "", 9)
         for r in res_unicos:
@@ -56,22 +51,21 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
             pdf.cell(40, 10, r["Fluxo (L/m²h)"], 1)
             pdf.cell(30, 10, status_limpo, 1, ln=True)
             
-        # --- SEÇÃO DE VALIDAÇÃO E ASSINATURAS ---
+        # Validação e Assinaturas
         pdf.ln(20)
         data_atual = datetime.now().strftime("%d/%m/%Y")
         pdf.set_font("Arial", "I", 9)
         pdf.cell(190, 10, f"Documento gerado em: {data_atual}", ln=True, align="R")
-        pdf.ln(10)
+        pdf.ln(15)
         
-        # Linhas de Assinatura
         y_atual = pdf.get_y()
-        pdf.line(10, y_atual, 90, y_atual)      # Linha 1
-        pdf.line(110, y_atual, 190, y_atual)    # Linha 2
+        pdf.line(10, y_atual, 90, y_atual)
+        pdf.line(110, y_atual, 190, y_atual)
         
         pdf.ln(2)
         pdf.set_font("Arial", "B", 9)
         pdf.cell(80, 5, "Elaborado (Responsavel)", 0, align="C")
-        pdf.cell(20, 5, "", 0) # Espaço
+        pdf.cell(20, 5, "", 0) 
         pdf.cell(80, 5, "Conferido (Validacao)", 0, ln=True, align="C")
         
         pdf.set_font("Arial", "", 8)
@@ -82,45 +76,33 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         return f"Erro ao gerar PDF: {str(e)}"
 
 # ---------------------------------------------------------
-# LAYOUT PRINCIPAL (STREAMLIT)
+# INTERFACE PRINCIPAL
 # ---------------------------------------------------------
-# --- LÓGICA DO LOGOTIPO (VERSÃO ESTABILIZADA) ---
-# Tente usar este link direto que é mais leve e compatível
-logo_url = "https://raw.githubusercontent.com/cleanova-branding/assets/main/logo.png" 
-
-# Caso o link acima falhe, o Streamlit exibirá apenas o título para não travar o app
-try:
-    col_l, col_t = st.columns([1, 3])
-    with col_l: 
-        st.image(logo_url, width=280)
-    with col_t: 
-        st.title("Dimensionador de Filtro Prensa")
-    st.sidebar.image(logo_url, use_container_width=True)
-except:
-    st.title("Cleanova Micronics | Dimensionador")
+st.title("Cleanova Micronics | Dimensionador de Filtro Prensa")
+st.markdown("---")
 
 # IDENTIFICAÇÃO
-r1_c1, r1_c2, r1_c3 = st.columns(3)
-with r1_c1: cliente = st.text_input("👤 Nome do Cliente")
-with r1_c2: projeto = st.text_input("📂 Nome do Projeto")
-with r1_c3: mercado = st.text_input("🏭 Mercado")
+col1, col2, col3 = st.columns(3)
+with col1: cliente = st.text_input("👤 Nome do Cliente")
+with col2: projeto = st.text_input("📂 Nome do Projeto")
+with col3: mercado = st.text_input("🏭 Mercado (Ex: Mineracao)")
 
-r2_c1, r2_c2, r2_c3 = st.columns(3)
-with r2_c1: produto = st.text_input("📦 Produto")
-with r2_c2: n_opp = st.text_input("🔢 Nº OPP")
-with r2_c3: responsavel = st.text_input("👨‍💻 Responsável pelo Projeto")
+col4, col5, col6 = st.columns(3)
+with col4: produto = st.text_input("📦 Produto")
+with col5: n_opp = st.text_input("🔢 Nº OPP")
+with col6: responsavel = st.text_input("👨‍💻 Responsável pelo Projeto")
 
 st.markdown("---")
 
 # SIDEBAR DADOS
 st.sidebar.header("🚀 Capacidade")
 solidos_dia = st.sidebar.number_input("Peso Seco (ton/dia)", value=100.0)
-horas_op = st.sidebar.number_input("Horas/dia", value=20.0)
+horas_op = st.sidebar.number_input("Disponibilidade (Horas/dia)", value=20.0)
 tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=60)
 
-st.sidebar.header("📝 Dados de Processo")
-temp_processo = st.sidebar.number_input("Temperatura (°C)", value=25)
-ph_solucao = st.sidebar.number_input("pH", value=7.0)
+st.sidebar.header("📝 Processo")
+temp_proc = st.sidebar.number_input("Temperatura (°C)", value=25)
+ph_sol = st.sidebar.number_input("pH", value=7.0)
 lav_lona = st.sidebar.selectbox("Lavagem de Lona?", ["Sim", "Não"])
 lav_torta = st.sidebar.selectbox("Lavagem de Torta?", ["Sim", "Não"])
 membrana = st.sidebar.selectbox("Membrana?", ["Sim", "Não"])
@@ -165,14 +147,11 @@ st.table(res_list)
 # BOTÃO PDF
 st.markdown("---")
 if cliente and n_opp and responsavel:
-    dados_tec = {
-        "temp": temp_processo, "ph": ph_solucao, 
-        "lav_l": lav_lona, "lav_t": lav_torta, "mem": membrana
-    }
+    dados_tec = {"temp": temp_proc, "ph": ph_sol, "lav_l": lav_lona, "lav_t": lav_torta, "mem": membrana}
     pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, dados_tec, res_list)
     
     if isinstance(pdf_bytes, bytes):
         st.download_button(label="📄 Gerar Relatório PDF Final", data=pdf_bytes, 
-                           file_name=f"Estudo_Tecnico_{cliente}_{n_opp}.pdf", mime="application/pdf")
+                           file_name=f"Estudo_{cliente}_{n_opp}.pdf", mime="application/pdf")
 else:
-    st.info("💡 Preencha o Cliente, Nº OPP e Responsável para gerar o documento.")
+    st.info("💡 Preencha o Cliente, Nº OPP e Responsável para habilitar o PDF.")
