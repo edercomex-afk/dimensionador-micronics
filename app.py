@@ -6,7 +6,7 @@ from fpdf import FPDF
 st.set_page_config(page_title="Cleanova Micronics | Dimensionador", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (V40)
+# FUNÇÃO PARA GERAR PDF (V41)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis, opex):
     try:
@@ -155,7 +155,7 @@ if res_list:
 else:
     lonas_mes = total_opex_mes = opex_ton_seca = 0
 
-# EXIBIÇÃO DE KPIS (CICLOS MÊS AQUI)
+# --- EXIBIÇÃO ---
 k1, k2, k3, k4, k5 = st.columns(5)
 k1.metric("Peso Torta", f"{peso_torta_dia:.1f} t/d")
 k2.metric("Horas Úteis", f"{disp_h:.1f} h/d")
@@ -168,14 +168,27 @@ st.table(res_list)
 
 st.subheader("💰 Resumo Financeiro Estimado (Mensal)")
 f1, f2, f3 = st.columns(3)
-# REMOVIDO CICLOS DAQUI E MANTIDO OS FINANCEIROS ORIGINAIS
 f1.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
 f2.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
 f3.success(f"📊 Custo Total/Mês: R$ {total_opex_mes:,.2f}")
 
 st.markdown("---")
+
+# ZONA DE DOWNLOAD (Garantindo visibilidade)
 if cliente and n_opp and responsavel:
     kpis_pdf = {"peso_torta_dia": peso_torta_dia, "disp_h": disp_h, "solidos_dia": solidos_dia, "ciclos_mes": ciclos_mes}
     opex_pdf = {"energia_mes": energia_mes, "lonas_mes": lonas_mes, "total_t_seca": opex_ton_seca}
     pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, {}, res_list, kpis_pdf, opex_pdf)
-    st.download_button("📄 Baixar Relatório PDF V40", data=pdf_bytes, file_name=f"Estudo_{n_opp}.pdf", mime="application/pdf")
+    
+    # Criando um container centralizado para o botão
+    col_btn = st.columns([1, 2, 1])
+    with col_btn[1]:
+        st.download_button(
+            label="⬇️ BAIXAR RELATÓRIO PDF COMPLETO",
+            data=pdf_bytes,
+            file_name=f"Estudo_Micronics_{n_opp}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+else:
+    st.warning("⚠️ O PDF será habilitado após preencher: Cliente, Nº OPP e Responsável.")
