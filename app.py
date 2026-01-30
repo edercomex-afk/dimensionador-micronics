@@ -6,7 +6,7 @@ from fpdf import FPDF
 st.set_page_config(page_title="Cleanova Micronics | Dimensionador", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (VERSÃO V39)
+# FUNÇÃO PARA GERAR PDF (V40)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis, opex):
     try:
@@ -145,7 +145,7 @@ for p in tamanhos:
         "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
     })
 
-# OPEX
+# FINANCEIRO
 energia_mes = (20 * disp_h * 30) * custo_kwh
 if res_list:
     n_placas_ref = int(res_list[0]["Placas"])
@@ -155,7 +155,7 @@ if res_list:
 else:
     lonas_mes = total_opex_mes = opex_ton_seca = 0
 
-# EXIBIÇÃO
+# EXIBIÇÃO DE KPIS (CICLOS MÊS AQUI)
 k1, k2, k3, k4, k5 = st.columns(5)
 k1.metric("Peso Torta", f"{peso_torta_dia:.1f} t/d")
 k2.metric("Horas Úteis", f"{disp_h:.1f} h/d")
@@ -166,18 +166,16 @@ k5.metric("Conc. Sólidos", f"{conc_solidos_calc:.1f} %")
 st.subheader("📋 Performance por Modelo")
 st.table(res_list)
 
-st.subheader("💰 Resumo Operacional Mensal")
+st.subheader("💰 Resumo Financeiro Estimado (Mensal)")
 f1, f2, f3 = st.columns(3)
-f1.info(f"🔄 Total de Ciclos: {ciclos_mes:.0f} / mês")
-f2.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
-f3.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
+# REMOVIDO CICLOS DAQUI E MANTIDO OS FINANCEIROS ORIGINAIS
+f1.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
+f2.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
+f3.success(f"📊 Custo Total/Mês: R$ {total_opex_mes:,.2f}")
 
 st.markdown("---")
-# BOTÃO DE PDF REPOSICIONADO E VALIDADO
 if cliente and n_opp and responsavel:
     kpis_pdf = {"peso_torta_dia": peso_torta_dia, "disp_h": disp_h, "solidos_dia": solidos_dia, "ciclos_mes": ciclos_mes}
     opex_pdf = {"energia_mes": energia_mes, "lonas_mes": lonas_mes, "total_t_seca": opex_ton_seca}
     pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, {}, res_list, kpis_pdf, opex_pdf)
-    st.download_button("📄 Baixar Relatório PDF Final", data=pdf_bytes, file_name=f"Estudo_{n_opp}.pdf", mime="application/pdf")
-else:
-    st.warning("⚠️ Preencha: Cliente, Nº OPP e Responsável para liberar o PDF.")
+    st.download_button("📄 Baixar Relatório PDF V40", data=pdf_bytes, file_name=f"Estudo_{n_opp}.pdf", mime="application/pdf")
