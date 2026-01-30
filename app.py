@@ -224,4 +224,8 @@ if cliente and n_opp and responsavel:
     st.download_button(
         label="📄 Baixar Relatório PDF Final", 
         data=pdf_bytes, 
-        file_name=f"Estudo
+        file_name=f"Estudo_{cliente}_{n_opp}.pdf", 
+        mime="application/pdf"
+    )
+else:
+    st.warning("⚠️ Preencha os campos 'Cliente', 'Nº OPP' e 'Responsável' para habilitar a geração do PDF.")
