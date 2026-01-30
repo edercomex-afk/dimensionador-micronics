@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (8 MODELOS)
+# FUNÇÃO PARA GERAR PDF (ESTRUTURA MANTIDA)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis):
     try:
@@ -46,7 +46,6 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.cell(95, 7, f"Conc. Solidos: {kpis['conc_sol']:.2f} %", 1, ln=True)
         pdf.ln(8)
         
-        # Ajuste de fonte para caber 8 linhas
         pdf.set_font("Arial", "B", 8)
         pdf.cell(35, 10, "Modelo", 1); pdf.cell(15, 10, "Placas", 1); pdf.cell(25, 10, "Area (m2)", 1); 
         pdf.cell(25, 10, "Fluxo (L/m2h)", 1); pdf.cell(65, 10, "Dry Solids Load (kg/m2/d)", 1); pdf.cell(25, 10, "Status", 1, ln=True)
@@ -126,7 +125,7 @@ k2.metric("Horas Úteis", f"{disp_h:.1f} h/d")
 k3.metric("Ciclos/dia", f"{ciclos_dia:.1f}")
 k4.metric("Conc. Sólidos", f"{conc_solidos_calc:.1f} %")
 
-# LISTA ATUALIZADA - 8 MODELOS
+# LISTA COMPLETA DE MODELOS
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -139,22 +138,48 @@ tamanhos = [
 ]
 
 st.subheader("📋 Performance por Modelo")
+
+
 res_list = []
 for p in tamanhos:
     vol_ajustado = p["vol_ref"] * (recesso / 30)
     num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
+    
+    # REGRA: Ocultar modelos grandes (>1000mm) se resultarem em menos de 25 placas
+    if p["nom"] > 1000 and num_placas < 25:
+        continue
+        
     area_t = num_placas * p["area_ref"]
     fluxo = vazao_lh / area_t if area_t > 0 else 0
     dry_solids_load = (solidos_dia * 1000) / area_t if area_t > 0 else 0
+    
     res_list.append({
-        "Modelo (mm)": f"{p['nom']}x{p['nom']}", "Placas": num_placas, "Area": f"{area_t:.1f}",
-        "Fluxo": f"{fluxo:.1f}", "Dry Solids Load": f"{dry_solids_load:.1f}",
+        "Modelo (mm)": f"{p['nom']}x{p['nom']}", 
+        "Placas": num_placas, 
+        "Area": f"{area_t:.1f}",
+        "Fluxo": f"{fluxo:.1f}", 
+        "Dry Solids Load": f"{dry_solids_load:.1f}",
         "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
     })
-st.table(res_list)
 
+if res_list:
+    st.table(res_list)
+else:
+    st.warning("Nenhum modelo atende aos critérios com a configuração atual.")
+
+# EXPORTAÇÃO (Restauração do botão com validação)
+st.markdown("---")
 if cliente and n_opp and responsavel:
     dados_tec = {"temp": temp_proc, "ph": ph_sol, "lav_l": lav_lona, "lav_t": lav_torta, "mem": membrana, "auto": nivel_auto}
     kpis_pdf = {"peso_torta_dia": peso_torta_dia, "disp_pct": utilizacao_pct, "disp_h": disp_h, "vol_lodo_dia": vol_lodo_dia, "conc_sol": conc_solidos_calc}
+    
     pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, dados_tec, res_list, kpis_pdf)
-    st.download_button("📄 Baixar Relatório PDF Final", data=pdf_bytes, file_name=f"Estudo_{cliente}_{n_opp}.pdf", mime="application/pdf")
+    
+    st.download_button(
+        label="📄 Gerar Relatório PDF Final", 
+        data=pdf_bytes, 
+        file_name=f"Estudo_{cliente}_{n_opp}.pdf", 
+        mime="application/pdf"
+    )
+else:
+    st.info("💡 Para habilitar o PDF, preencha: Cliente, Nº OPP e Responsável.")
