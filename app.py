@@ -6,7 +6,7 @@ from fpdf import FPDF
 st.set_page_config(page_title="Cleanova Micronics | Dimensionador", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (INCLUINDO CICLOS MENSAIS)
+# FUNÇÃO PARA GERAR PDF (VERSÃO V39)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis, opex):
     try:
@@ -46,7 +46,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.cell(64, 7, f"Custo Total: R$ {opex['total_t_seca']:.2f} / t seca", 1, ln=True)
         pdf.ln(8)
         
-        # Tabela de Modelos
+        # Tabela
         pdf.set_font("Arial", "B", 8)
         pdf.cell(35, 10, "Modelo", 1); pdf.cell(15, 10, "Placas", 1); pdf.cell(25, 10, "Area (m2)", 1); 
         pdf.cell(25, 10, "Fluxo (L/m2h)", 1); pdf.cell(65, 10, "Dry Solids Load (kg/m2/d)", 1); pdf.cell(25, 10, "Status", 1, ln=True)
@@ -70,7 +70,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         return f"Erro ao gerar PDF: {str(e)}"
 
 # ---------------------------------------------------------
-# INTERFACE STREAMLIT
+# INTERFACE
 # ---------------------------------------------------------
 st.title("Cleanova Micronics | Dimensionador & OPEX")
 st.markdown("---")
@@ -93,11 +93,6 @@ solidos_dia = st.sidebar.number_input("Sólidos secos/dia (ton/dia)", value=100.
 utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 90)
 tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=45)
 
-st.sidebar.header("📝 Processo e Automação")
-nivel_auto = st.sidebar.selectbox("Nível de Automação", ["Manual", "Semiautomático", "Automático (Full)"])
-lav_lona = st.sidebar.selectbox("Lavagem de Lona?", ["Sim", "Não"])
-lav_torta = st.sidebar.selectbox("Lavagem de Torta?", ["Sim", "Não"])
-
 st.sidebar.header("🧪 Propriedades Técnicas")
 vazao_lh = st.sidebar.number_input("Vazão de Alimentação (L/h)", value=50000.0)
 vol_lodo_dia = st.sidebar.number_input("Volume lodo/dia (m³/dia)", value=500.0)
@@ -110,11 +105,11 @@ custo_kwh = st.sidebar.number_input("Custo Energia (R$/kWh)", value=0.65)
 custo_lona_un = st.sidebar.number_input("Preço estimado lona (R$/unid)", value=450.0)
 vida_lona_ciclos = st.sidebar.number_input("Vida útil lona (Ciclos)", value=2000)
 
-# CÁLCULOS TÉCNICOS
+# CÁLCULOS
 umidade = umidade_input / 100
 disp_h = 24 * (utilizacao_pct / 100)
 ciclos_dia = (disp_h * 60) / tempo_cycle if tempo_cycle > 0 else 0
-ciclos_mes = ciclos_dia * 30  # KPI SOLICITADO
+ciclos_mes = ciclos_dia * 30
 
 conc_solidos_calc = (solidos_dia / vol_lodo_dia) * 100 if vol_lodo_dia > 0 else 0
 peso_torta_dia = solidos_dia / (1 - umidade) if (1-umidade) > 0 else 0
@@ -122,7 +117,7 @@ massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
 vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
 
-# MODELAGEM DE EQUIPAMENTOS
+# MODELOS
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -150,21 +145,21 @@ for p in tamanhos:
         "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
     })
 
-# CÁLCULOS FINANCEIROS
+# OPEX
 energia_mes = (20 * disp_h * 30) * custo_kwh
 if res_list:
     n_placas_ref = int(res_list[0]["Placas"])
     lonas_mes = (ciclos_mes / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un
     total_opex_mes = energia_mes + lonas_mes
-    opex_ton_seca = total_opex_mes / (solidos_dia * 30)
+    opex_ton_seca = total_opex_mes / (solidos_dia * 30) if solidos_dia > 0 else 0
 else:
     lonas_mes = total_opex_mes = opex_ton_seca = 0
 
-# --- EXIBIÇÃO NO APP ---
+# EXIBIÇÃO
 k1, k2, k3, k4, k5 = st.columns(5)
 k1.metric("Peso Torta", f"{peso_torta_dia:.1f} t/d")
 k2.metric("Horas Úteis", f"{disp_h:.1f} h/d")
-k3.metric("Ciclos/Mês", f"{ciclos_mes:.0f}") # NOVO KPI EXPOSTO
+k3.metric("Ciclos/Mês", f"{ciclos_mes:.0f}")
 k4.metric("OPEX / t seca", f"R$ {opex_ton_seca:.2f}")
 k5.metric("Conc. Sólidos", f"{conc_solidos_calc:.1f} %")
 
@@ -173,13 +168,16 @@ st.table(res_list)
 
 st.subheader("💰 Resumo Operacional Mensal")
 f1, f2, f3 = st.columns(3)
-f1.info(f"🔄 Total de Ciclos: {ciclos_mes:.0f} ciclos/mês")
+f1.info(f"🔄 Total de Ciclos: {ciclos_mes:.0f} / mês")
 f2.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
 f3.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
 
-# PDF
+st.markdown("---")
+# BOTÃO DE PDF REPOSICIONADO E VALIDADO
 if cliente and n_opp and responsavel:
     kpis_pdf = {"peso_torta_dia": peso_torta_dia, "disp_h": disp_h, "solidos_dia": solidos_dia, "ciclos_mes": ciclos_mes}
     opex_pdf = {"energia_mes": energia_mes, "lonas_mes": lonas_mes, "total_t_seca": opex_ton_seca}
     pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, {}, res_list, kpis_pdf, opex_pdf)
-    st.download_button("📄 Baixar Relatório PDF V38", data=pdf_bytes, file_name=f"Estudo_{n_opp}.pdf", mime="application/pdf")
+    st.download_button("📄 Baixar Relatório PDF Final", data=pdf_bytes, file_name=f"Estudo_{n_opp}.pdf", mime="application/pdf")
+else:
+    st.warning("⚠️ Preencha: Cliente, Nº OPP e Responsável para liberar o PDF.")
