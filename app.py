@@ -6,7 +6,7 @@ from fpdf import FPDF
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (INCLUINDO OPEX E DADOS MANUAIS)
+# FUNÇÃO PARA GERAR PDF (VERSÃO COMPATÍVEL)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis, opex):
     try:
@@ -47,7 +47,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.cell(95, 7, f"Conc. Solidos: {kpis['conc_sol']:.2f} %", 1, ln=True)
         pdf.ln(5)
 
-        # OPEX no PDF
+        # OPEX
         pdf.set_font("Arial", "B", 10)
         pdf.cell(190, 7, "Estimativa de Custos Operacionais (OPEX):", ln=True)
         pdf.set_font("Arial", "", 9)
@@ -56,7 +56,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.cell(64, 7, f"Custo Total: R$ {opex['total_t_seca']:.2f} / t seca", 1, ln=True)
         pdf.ln(8)
         
-        # Tabela de Modelos
+        # Tabela
         pdf.set_font("Arial", "B", 8)
         pdf.cell(35, 10, "Modelo", 1); pdf.cell(15, 10, "Placas", 1); pdf.cell(25, 10, "Area (m2)", 1); 
         pdf.cell(25, 10, "Fluxo (L/m2h)", 1); pdf.cell(65, 10, "Dry Solids Load (kg/m2/d)", 1); pdf.cell(25, 10, "Status", 1, ln=True)
@@ -73,7 +73,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
             
         pdf.ln(10)
         pdf.set_font("Arial", "B", 9)
-        pdf.cell(80, 5, "Elaborado (Responsavel)", 0, align="C"); pdf.cell(20, 5, "", 0); pdf.cell(80, 5, "Conferido (Validacao)", 0, ln=True, align="C")
+        pdf.cell(80, 5, "Elaborado", 0, align="C"); pdf.cell(20, 5, "", 0); pdf.cell(80, 5, "Conferido", 0, ln=True, align="C")
         
         return pdf.output(dest="S").encode("latin-1", "ignore")
     except Exception as e:
@@ -92,8 +92,8 @@ with c3: mercado = st.text_input("🏭 Mercado")
 
 c4, c5, c6 = st.columns(3)
 with c4: produto = st.text_input("📦 Produto")
-with n_opp := c5.text_input("🔢 Nº OPP"): pass
-with responsavel := c6.text_input("👨‍💻 Responsável"): pass
+with c5: n_opp = st.text_input("🔢 Nº OPP")
+with c6: responsavel = st.text_input("👨‍💻 Responsável")
 
 st.markdown("---")
 
@@ -112,9 +112,8 @@ recesso = st.sidebar.number_input("Espessura câmara (mm)", value=30.0)
 
 st.sidebar.header("💰 Custos Operacionais (OPEX)")
 custo_kwh = st.sidebar.number_input("Custo Energia (R$/kWh)", value=0.65)
-# CAMPOS MANUAIS CONFORME SOLICITADO
-custo_lona_un = st.sidebar.number_input("Preço estimado de 1 lona (R$/unid)", value=450.0)
-vida_lona_ciclos = st.sidebar.number_input("Vida útil estimada da lona (Ciclos)", value=2000)
+custo_lona_un = st.sidebar.number_input("Preço estimado lona (R$/unid)", value=450.0)
+vida_lona_ciclos = st.sidebar.number_input("Vida útil lona (Ciclos)", value=2000)
 
 # CÁLCULOS
 umidade = umidade_input / 100
@@ -126,6 +125,7 @@ massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
 vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
 
+# OPEX
 energia_mes = (20 * disp_h * 30) * custo_kwh
 ciclos_mes = ciclos_dia * 30
 
@@ -157,10 +157,8 @@ for p in tamanhos:
         "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
     })
 
-# CÁLCULO OPEX DINÂMICO
 if res_list:
     n_placas_ref = int(res_list[0]["Placas"])
-    # 2 lonas por placa (frente e verso)
     lonas_mes = (ciclos_mes / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un
     total_opex_mes = energia_mes + lonas_mes
     opex_ton_seca = total_opex_mes / (solidos_dia * 30)
@@ -175,14 +173,13 @@ k3.metric("OPEX / t seca", f"R$ {opex_ton_seca:.2f}")
 k4.metric("Conc. Sólidos", f"{conc_solidos_calc:.1f} %")
 
 st.subheader("📋 Performance por Modelo")
-
 st.table(res_list)
 
-st.subheader("💰 Resumo Financeiro Estimado (Mensal)")
+st.subheader("💰 Resumo Financeiro Mensal")
 f1, f2, f3 = st.columns(3)
 f1.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
 f2.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
-f3.success(f"📊 Custo Total/Mês: R$ {total_opex_mes:,.2f}")
+f3.success(f"📊 Total/Mês: R$ {total_opex_mes:,.2f}")
 
 # PDF
 st.markdown("---")
@@ -191,4 +188,4 @@ if cliente and n_opp and responsavel:
     kpis_pdf = {"peso_torta_dia": peso_torta_dia, "disp_pct": utilizacao_pct, "disp_h": disp_h, "vol_lodo_dia": vol_lodo_dia, "conc_sol": conc_solidos_calc, "solidos_dia": solidos_dia}
     opex_pdf = {"energia_mes": energia_mes, "lonas_mes": lonas_mes, "total_t_seca": opex_ton_seca}
     pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, dados_tec, res_list, kpis_pdf, opex_pdf)
-    st.download_button("📄 Baixar Relatório PDF com OPEX", data=pdf_bytes, file_name=f"Estudo_{cliente}_{n_opp}.pdf", mime="application/pdf")
+    st.download_button("📄 Baixar Relatório PDF Final", data=pdf_bytes, file_name=f"Estudo_{cliente}_{n_opp}.pdf", mime="application/pdf")
