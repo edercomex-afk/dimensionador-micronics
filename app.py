@@ -3,10 +3,10 @@ import math
 from fpdf import FPDF
 
 # 1. Configuração da página
-st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | Dimensionador", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (VERSÃO COMPATÍVEL)
+# FUNÇÃO PARA GERAR PDF (VERSÃO COMPATÍVEL E COMPLETA)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis, opex):
     try:
@@ -73,7 +73,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
             
         pdf.ln(10)
         pdf.set_font("Arial", "B", 9)
-        pdf.cell(80, 5, "Elaborado", 0, align="C"); pdf.cell(20, 5, "", 0); pdf.cell(80, 5, "Conferido", 0, ln=True, align="C")
+        pdf.cell(80, 5, "Elaborado (Responsavel)", 0, align="C"); pdf.cell(20, 5, "", 0); pdf.cell(80, 5, "Conferido (Validacao)", 0, ln=True, align="C")
         
         return pdf.output(dest="S").encode("latin-1", "ignore")
     except Exception as e:
@@ -86,22 +86,30 @@ st.title("Cleanova Micronics | Dimensionador & OPEX")
 st.markdown("---")
 
 c1, c2, c3 = st.columns(3)
-with c1: cliente = st.text_input("👤 Nome do Cliente")
-with c2: projeto = st.text_input("📂 Nome do Projeto")
-with c3: mercado = st.text_input("🏭 Mercado")
+cliente = c1.text_input("👤 Nome do Cliente")
+projeto = c2.text_input("📂 Nome do Projeto")
+mercado = c3.text_input("🏭 Mercado")
 
 c4, c5, c6 = st.columns(3)
-with c4: produto = st.text_input("📦 Produto")
-with c5: n_opp = st.text_input("🔢 Nº OPP")
-with c6: responsavel = st.text_input("👨‍💻 Responsável")
+produto = c4.text_input("📦 Produto")
+n_opp = c5.text_input("🔢 Nº OPP")
+responsavel = c6.text_input("👨‍💻 Responsável")
 
 st.markdown("---")
 
-# SIDEBAR
+# SIDEBAR - DADOS TÉCNICOS E PROCESSO
 st.sidebar.header("🚀 Capacidade")
 solidos_dia = st.sidebar.number_input("Sólidos secos/dia (ton/dia)", value=100.0)
 utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 80)
 tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=60)
+
+st.sidebar.header("📝 Processo e Automação")
+temp_proc = st.sidebar.number_input("Temperatura (°C)", value=25)
+ph_sol = st.sidebar.number_input("pH", value=7.0)
+nivel_auto = st.sidebar.selectbox("Nível de Automação", ["Manual", "Semiautomático", "Automático (Full)"])
+lav_lona = st.sidebar.selectbox("Lavagem de Lona?", ["Sim", "Não"])
+lav_torta = st.sidebar.selectbox("Lavagem de Torta?", ["Sim", "Não"])
+membrana = st.sidebar.selectbox("Membrana?", ["Sim", "Não"])
 
 st.sidebar.header("🧪 Propriedades Técnicas")
 vazao_lh = st.sidebar.number_input("Vazão de Alimentação (L/h)", value=50000.0)
@@ -125,11 +133,11 @@ massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
 vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
 
-# OPEX
+# OPEX MENSAL
 energia_mes = (20 * disp_h * 30) * custo_kwh
 ciclos_mes = ciclos_dia * 30
 
-# MODELOS
+# MODELOS DE PLACAS
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -145,7 +153,10 @@ res_list = []
 for p in tamanhos:
     vol_ajustado = p["vol_ref"] * (recesso / 30)
     num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
-    if p["nom"] > 1000 and num_placas < 25: continue
+    
+    # Regra de exclusão para modelos grandes com poucas placas
+    if p["nom"] > 1000 and num_placas < 25:
+        continue
     
     area_t = num_placas * p["area_ref"]
     fluxo = vazao_lh / area_t if area_t > 0 else 0
@@ -157,6 +168,7 @@ for p in tamanhos:
         "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
     })
 
+# CÁLCULO OPEX DINÂMICO
 if res_list:
     n_placas_ref = int(res_list[0]["Placas"])
     lonas_mes = (ciclos_mes / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un
@@ -165,7 +177,7 @@ if res_list:
 else:
     lonas_mes = total_opex_mes = opex_ton_seca = 0
 
-# EXIBIÇÃO
+# EXIBIÇÃO DE KPIS PRINCIPAIS
 k1, k2, k3, k4 = st.columns(4)
 k1.metric("Peso Torta Úmida", f"{peso_torta_dia:.1f} t/d")
 k2.metric("Horas Úteis", f"{disp_h:.1f} h/d")
@@ -181,11 +193,35 @@ f1.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
 f2.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
 f3.success(f"📊 Total/Mês: R$ {total_opex_mes:,.2f}")
 
-# PDF
+# GERAÇÃO DO PDF
 st.markdown("---")
 if cliente and n_opp and responsavel:
-    dados_tec = {"temp": 25, "ph": 7.0, "lav_l": "Sim", "lav_t": "Sim", "mem": "Não", "auto": "Full"}
-    kpis_pdf = {"peso_torta_dia": peso_torta_dia, "disp_pct": utilizacao_pct, "disp_h": disp_h, "vol_lodo_dia": vol_lodo_dia, "conc_sol": conc_solidos_calc, "solidos_dia": solidos_dia}
-    opex_pdf = {"energia_mes": energia_mes, "lonas_mes": lonas_mes, "total_t_seca": opex_ton_seca}
-    pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, dados_tec, res_list, kpis_pdf, opex_pdf)
-    st.download_button("📄 Baixar Relatório PDF Final", data=pdf_bytes, file_name=f"Estudo_{cliente}_{n_opp}.pdf", mime="application/pdf")
+    # Captura os dados técnicos da sidebar para o PDF
+    dados_tec_pdf = {
+        "temp": temp_proc, 
+        "ph": ph_sol, 
+        "lav_l": lav_lona, 
+        "lav_t": lav_torta, 
+        "mem": membrana, 
+        "auto": nivel_auto
+    }
+    kpis_pdf = {
+        "peso_torta_dia": peso_torta_dia, 
+        "disp_pct": utilizacao_pct, 
+        "disp_h": disp_h, 
+        "vol_lodo_dia": vol_lodo_dia, 
+        "conc_sol": conc_solidos_calc, 
+        "solidos_dia": solidos_dia
+    }
+    opex_pdf = {
+        "energia_mes": energia_mes, 
+        "lonas_mes": lonas_mes, 
+        "total_t_seca": opex_ton_seca
+    }
+    
+    pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, dados_tec_pdf, res_list, kpis_pdf, opex_pdf)
+    
+    st.download_button(
+        label="📄 Baixar Relatório PDF Final", 
+        data=pdf_bytes, 
+        file_name=f"Estudo
