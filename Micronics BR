@@ -6,7 +6,7 @@ from fpdf import FPDF
 st.set_page_config(page_title="Dimensionamento Cleanova Micronics", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (INCLUINDO OPEX)
+# FUNÇÃO PARA GERAR PDF (INCLUINDO OPEX E DADOS MANUAIS)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis, opex):
     try:
@@ -97,7 +97,7 @@ with responsavel := c6.text_input("👨‍💻 Responsável"): pass
 
 st.markdown("---")
 
-# SIDEBAR - DADOS EXISTENTES
+# SIDEBAR
 st.sidebar.header("🚀 Capacidade")
 solidos_dia = st.sidebar.number_input("Sólidos secos/dia (ton/dia)", value=100.0)
 utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 80)
@@ -110,13 +110,13 @@ sg_solidos = st.sidebar.number_input("Gravidade específica sólidos secos", val
 umidade_input = st.sidebar.number_input("Umidade Torta (%)", value=20.0)
 recesso = st.sidebar.number_input("Espessura câmara (mm)", value=30.0)
 
-# NOVA SEÇÃO OPEX NA SIDEBAR
 st.sidebar.header("💰 Custos Operacionais (OPEX)")
 custo_kwh = st.sidebar.number_input("Custo Energia (R$/kWh)", value=0.65)
-custo_lona_un = st.sidebar.number_input("Custo médio Lona (R$/unid)", value=450.0)
-vida_lona_ciclos = st.sidebar.number_input("Vida útil lona (Ciclos)", value=2000)
+# CAMPOS MANUAIS CONFORME SOLICITADO
+custo_lona_un = st.sidebar.number_input("Preço estimado de 1 lona (R$/unid)", value=450.0)
+vida_lona_ciclos = st.sidebar.number_input("Vida útil estimada da lona (Ciclos)", value=2000)
 
-# CÁLCULOS TÉCNICOS
+# CÁLCULOS
 umidade = umidade_input / 100
 disp_h = 24 * (utilizacao_pct / 100)
 ciclos_dia = (disp_h * 60) / tempo_cycle if tempo_cycle > 0 else 0
@@ -126,11 +126,10 @@ massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
 vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
 
-# CÁLCULOS OPEX (Estimativa baseada em 20kW motor + ciclos)
 energia_mes = (20 * disp_h * 30) * custo_kwh
 ciclos_mes = ciclos_dia * 30
 
-# PERFORMANCE POR MODELO (8 OPÇÕES COM REGRA DE 25 PLACAS)
+# MODELOS
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -143,7 +142,6 @@ tamanhos = [
 ]
 
 res_list = []
-total_lonas_mes = 0
 for p in tamanhos:
     vol_ajustado = p["vol_ref"] * (recesso / 30)
     num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
@@ -159,9 +157,10 @@ for p in tamanhos:
         "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
     })
 
-# Custo de Lonas (Baseado no primeiro modelo da lista como referência de porte)
+# CÁLCULO OPEX DINÂMICO
 if res_list:
     n_placas_ref = int(res_list[0]["Placas"])
+    # 2 lonas por placa (frente e verso)
     lonas_mes = (ciclos_mes / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un
     total_opex_mes = energia_mes + lonas_mes
     opex_ton_seca = total_opex_mes / (solidos_dia * 30)
@@ -176,6 +175,7 @@ k3.metric("OPEX / t seca", f"R$ {opex_ton_seca:.2f}")
 k4.metric("Conc. Sólidos", f"{conc_solidos_calc:.1f} %")
 
 st.subheader("📋 Performance por Modelo")
+
 st.table(res_list)
 
 st.subheader("💰 Resumo Financeiro Estimado (Mensal)")
