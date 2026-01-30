@@ -6,7 +6,7 @@ from fpdf import FPDF
 st.set_page_config(page_title="Cleanova Micronics | Dimensionador", layout="wide")
 
 # ---------------------------------------------------------
-# FUNÇÃO PARA GERAR PDF (VERSÃO COMPATÍVEL E COMPLETA)
+# FUNÇÃO PARA GERAR PDF (INCLUINDO CICLOS MENSAIS)
 # ---------------------------------------------------------
 def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, res_unicos, kpis, opex):
     try:
@@ -27,24 +27,14 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.cell(190, 7, f"Responsavel: {resp}".encode('latin-1', 'ignore').decode('latin-1'), 0, ln=True)
         pdf.ln(5)
 
-        # Informações Técnicas
+        # Performance e Ciclos
         pdf.set_font("Arial", "B", 10)
-        pdf.cell(190, 7, "Especificacoes de Processo e Automacao:", ln=True)
-        pdf.set_font("Arial", "", 9)
-        info_txt = (f"Produto: {produto} | Temp: {dados_tec['temp']}C | pH: {dados_tec['ph']} | "
-                    f"Lavagem Lona: {dados_tec['lav_l']} | Lavagem Torta: {dados_tec['lav_t']} | "
-                    f"Membrana: {dados_tec['mem']} | Automacao: {dados_tec['auto']}")
-        pdf.multi_cell(190, 7, info_txt.encode('latin-1', 'ignore').decode('latin-1'), border=1)
-        pdf.ln(5)
-        
-        # Performance
-        pdf.set_font("Arial", "B", 10)
-        pdf.cell(190, 7, "Indicadores de Performance Requeridos:", ln=True)
+        pdf.cell(190, 7, "Indicadores de Performance e Operacao:", ln=True)
         pdf.set_font("Arial", "", 9)
         pdf.cell(95, 7, f"Peso Total de Torta: {kpis['peso_torta_dia']:.2f} t/dia", 1)
-        pdf.cell(95, 7, f"Volume Lodo Diario: {kpis['vol_lodo_dia']:.2f} m3/dia", 1, ln=True)
+        pdf.cell(95, 7, f"Ciclos Estimados: {kpis['ciclos_mes']:.0f} ciclos/mes", 1, ln=True)
         pdf.cell(95, 7, f"Producao Solidos Secos: {kpis['solidos_dia']:.2f} t/dia", 1)
-        pdf.cell(95, 7, f"Conc. Solidos: {kpis['conc_sol']:.2f} %", 1, ln=True)
+        pdf.cell(95, 7, f"Disponibilidade: {kpis['disp_h']:.1f} h/dia", 1, ln=True)
         pdf.ln(5)
 
         # OPEX
@@ -56,7 +46,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         pdf.cell(64, 7, f"Custo Total: R$ {opex['total_t_seca']:.2f} / t seca", 1, ln=True)
         pdf.ln(8)
         
-        # Tabela
+        # Tabela de Modelos
         pdf.set_font("Arial", "B", 8)
         pdf.cell(35, 10, "Modelo", 1); pdf.cell(15, 10, "Placas", 1); pdf.cell(25, 10, "Area (m2)", 1); 
         pdf.cell(25, 10, "Fluxo (L/m2h)", 1); pdf.cell(65, 10, "Dry Solids Load (kg/m2/d)", 1); pdf.cell(25, 10, "Status", 1, ln=True)
@@ -80,7 +70,7 @@ def gerar_pdf_estudo(cliente, projeto, produto, mercado, opp, resp, dados_tec, r
         return f"Erro ao gerar PDF: {str(e)}"
 
 # ---------------------------------------------------------
-# INTERFACE PRINCIPAL
+# INTERFACE STREAMLIT
 # ---------------------------------------------------------
 st.title("Cleanova Micronics | Dimensionador & OPEX")
 st.markdown("---")
@@ -97,19 +87,16 @@ responsavel = c6.text_input("👨‍💻 Responsável")
 
 st.markdown("---")
 
-# SIDEBAR - DADOS TÉCNICOS E PROCESSO
+# SIDEBAR
 st.sidebar.header("🚀 Capacidade")
 solidos_dia = st.sidebar.number_input("Sólidos secos/dia (ton/dia)", value=100.0)
-utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 80)
-tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=60)
+utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 90)
+tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=45)
 
 st.sidebar.header("📝 Processo e Automação")
-temp_proc = st.sidebar.number_input("Temperatura (°C)", value=25)
-ph_sol = st.sidebar.number_input("pH", value=7.0)
 nivel_auto = st.sidebar.selectbox("Nível de Automação", ["Manual", "Semiautomático", "Automático (Full)"])
 lav_lona = st.sidebar.selectbox("Lavagem de Lona?", ["Sim", "Não"])
 lav_torta = st.sidebar.selectbox("Lavagem de Torta?", ["Sim", "Não"])
-membrana = st.sidebar.selectbox("Membrana?", ["Sim", "Não"])
 
 st.sidebar.header("🧪 Propriedades Técnicas")
 vazao_lh = st.sidebar.number_input("Vazão de Alimentação (L/h)", value=50000.0)
@@ -123,21 +110,19 @@ custo_kwh = st.sidebar.number_input("Custo Energia (R$/kWh)", value=0.65)
 custo_lona_un = st.sidebar.number_input("Preço estimado lona (R$/unid)", value=450.0)
 vida_lona_ciclos = st.sidebar.number_input("Vida útil lona (Ciclos)", value=2000)
 
-# CÁLCULOS
+# CÁLCULOS TÉCNICOS
 umidade = umidade_input / 100
 disp_h = 24 * (utilizacao_pct / 100)
 ciclos_dia = (disp_h * 60) / tempo_cycle if tempo_cycle > 0 else 0
+ciclos_mes = ciclos_dia * 30  # KPI SOLICITADO
+
 conc_solidos_calc = (solidos_dia / vol_lodo_dia) * 100 if vol_lodo_dia > 0 else 0
 peso_torta_dia = solidos_dia / (1 - umidade) if (1-umidade) > 0 else 0
 massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
 vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
 
-# OPEX MENSAL
-energia_mes = (20 * disp_h * 30) * custo_kwh
-ciclos_mes = ciclos_dia * 30
-
-# MODELOS DE PLACAS
+# MODELAGEM DE EQUIPAMENTOS
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -153,10 +138,7 @@ res_list = []
 for p in tamanhos:
     vol_ajustado = p["vol_ref"] * (recesso / 30)
     num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
-    
-    # Regra de exclusão para modelos grandes com poucas placas
-    if p["nom"] > 1000 and num_placas < 25:
-        continue
+    if p["nom"] > 1000 and num_placas < 25: continue
     
     area_t = num_placas * p["area_ref"]
     fluxo = vazao_lh / area_t if area_t > 0 else 0
@@ -168,7 +150,8 @@ for p in tamanhos:
         "Status": "✅ OK" if num_placas <= p["max"] else "❌ Limite"
     })
 
-# CÁLCULO OPEX DINÂMICO
+# CÁLCULOS FINANCEIROS
+energia_mes = (20 * disp_h * 30) * custo_kwh
 if res_list:
     n_placas_ref = int(res_list[0]["Placas"])
     lonas_mes = (ciclos_mes / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un
@@ -177,55 +160,26 @@ if res_list:
 else:
     lonas_mes = total_opex_mes = opex_ton_seca = 0
 
-# EXIBIÇÃO DE KPIS PRINCIPAIS
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Peso Torta Úmida", f"{peso_torta_dia:.1f} t/d")
+# --- EXIBIÇÃO NO APP ---
+k1, k2, k3, k4, k5 = st.columns(5)
+k1.metric("Peso Torta", f"{peso_torta_dia:.1f} t/d")
 k2.metric("Horas Úteis", f"{disp_h:.1f} h/d")
-k3.metric("OPEX / t seca", f"R$ {opex_ton_seca:.2f}")
-k4.metric("Conc. Sólidos", f"{conc_solidos_calc:.1f} %")
+k3.metric("Ciclos/Mês", f"{ciclos_mes:.0f}") # NOVO KPI EXPOSTO
+k4.metric("OPEX / t seca", f"R$ {opex_ton_seca:.2f}")
+k5.metric("Conc. Sólidos", f"{conc_solidos_calc:.1f} %")
 
 st.subheader("📋 Performance por Modelo")
 st.table(res_list)
 
-st.subheader("💰 Resumo Financeiro Mensal")
+st.subheader("💰 Resumo Operacional Mensal")
 f1, f2, f3 = st.columns(3)
-f1.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
-f2.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
-f3.success(f"📊 Total/Mês: R$ {total_opex_mes:,.2f}")
+f1.info(f"🔄 Total de Ciclos: {ciclos_mes:.0f} ciclos/mês")
+f2.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
+f3.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
 
-# GERAÇÃO DO PDF
-st.markdown("---")
+# PDF
 if cliente and n_opp and responsavel:
-    # Captura os dados técnicos da sidebar para o PDF
-    dados_tec_pdf = {
-        "temp": temp_proc, 
-        "ph": ph_sol, 
-        "lav_l": lav_lona, 
-        "lav_t": lav_torta, 
-        "mem": membrana, 
-        "auto": nivel_auto
-    }
-    kpis_pdf = {
-        "peso_torta_dia": peso_torta_dia, 
-        "disp_pct": utilizacao_pct, 
-        "disp_h": disp_h, 
-        "vol_lodo_dia": vol_lodo_dia, 
-        "conc_sol": conc_solidos_calc, 
-        "solidos_dia": solidos_dia
-    }
-    opex_pdf = {
-        "energia_mes": energia_mes, 
-        "lonas_mes": lonas_mes, 
-        "total_t_seca": opex_ton_seca
-    }
-    
-    pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, dados_tec_pdf, res_list, kpis_pdf, opex_pdf)
-    
-    st.download_button(
-        label="📄 Baixar Relatório PDF Final", 
-        data=pdf_bytes, 
-        file_name=f"Estudo_{cliente}_{n_opp}.pdf", 
-        mime="application/pdf"
-    )
-else:
-    st.warning("⚠️ Preencha os campos 'Cliente', 'Nº OPP' e 'Responsável' para habilitar a geração do PDF.")
+    kpis_pdf = {"peso_torta_dia": peso_torta_dia, "disp_h": disp_h, "solidos_dia": solidos_dia, "ciclos_mes": ciclos_mes}
+    opex_pdf = {"energia_mes": energia_mes, "lonas_mes": lonas_mes, "total_t_seca": opex_ton_seca}
+    pdf_bytes = gerar_pdf_estudo(cliente, projeto, produto, mercado, n_opp, responsavel, {}, res_list, kpis_pdf, opex_pdf)
+    st.download_button("📄 Baixar Relatório PDF V38", data=pdf_bytes, file_name=f"Estudo_{n_opp}.pdf", mime="application/pdf")
