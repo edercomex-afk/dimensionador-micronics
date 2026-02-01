@@ -6,9 +6,9 @@ from fpdf import FPDF
 import io
 
 # 1. Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V46 Full", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V47 Final Pro", layout="wide")
 
-# --- FUNÇÃO PARA GERAR O GRÁFICO ---
+# --- FUNÇÃO PARA GERAR O GRÁFICO (SALVANDO EM MEMÓRIA) ---
 def gerar_grafico_vazao_pressao(pressao_alvo, vazao_pico):
     tempo = np.linspace(0, 45, 100)
     pressao = pressao_alvo * (1 - np.exp(-0.15 * tempo))
@@ -23,8 +23,7 @@ def gerar_grafico_vazao_pressao(pressao_alvo, vazao_pico):
     ax2 = ax1.twinx()
     ax2.set_ylabel('Vazão (L/h)', color='tab:blue')
     ax2.plot(tempo, vazao, color='tab:blue', linewidth=3)
-    
-    plt.title(f"Comportamento Operacional: Bomba & Filtro")
+    plt.title("Comportamento Dinâmico: Bomba & Filtro")
     fig.tight_layout()
     
     img_buf = io.BytesIO()
@@ -32,96 +31,114 @@ def gerar_grafico_vazao_pressao(pressao_alvo, vazao_pico):
     img_buf.seek(0)
     return fig, img_buf
 
+# --- FUNÇÃO PDF V47 (COMPLETA COM GRÁFICO E TABELA) ---
+def gerar_pdf_estudo(cliente, opp, resp, res_unicos, kpis, opex, bomba, img_grafico):
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 16)
+        pdf.cell(190, 10, "ESTUDO TECNICO DE FILTRACAO", ln=True, align="C")
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(190, 10, "CLEANOVA MICRONICS", ln=True, align="C")
+        pdf.ln(10)
+        
+        # Cabeçalho
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(95, 8, f"Cliente: {cliente}", 1)
+        pdf.cell(95, 8, f"OPP: {opp}", 1, ln=True)
+        pdf.ln(5)
+
+        # Gráfico
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(190, 10, "Performance de Bombeamento", ln=True)
+        with open("temp_chart.png", "wb") as f:
+            f.write(img_grafico.getbuffer())
+        pdf.image("temp_chart.png", x=15, y=None, w=170)
+        pdf.ln(5)
+
+        # Tabela de Modelos
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(40, 8, "Modelo", 1); pdf.cell(25, 8, "Placas", 1); pdf.cell(35, 8, "Area (m2)", 1); pdf.cell(90, 8, "Bomba Sugerida", 1, ln=True)
+        pdf.set_font("Arial", "", 9)
+        for r in res_unicos:
+            pdf.cell(40, 8, r["Modelo (mm)"], 1)
+            pdf.cell(25, 8, str(r["Placas"]), 1)
+            pdf.cell(35, 8, r["Area"], 1)
+            pdf.cell(90, 8, bomba['marca'], 1, ln=True)
+            
+        return pdf.output(dest="S").encode("latin-1", "ignore")
+    except Exception as e: return f"Erro PDF: {str(e)}"
+
 # --- INTERFACE PRINCIPAL ---
-st.title("Cleanova Micronics | Engenharia de Aplicação V46")
-st.markdown("---")
+st.title("Cleanova Micronics | Dimensionador & Gráficos V47")
 
-# CABEÇALHO (Dados do Cliente)
+# Cabeçalho
 c1, c2, c3 = st.columns(3)
-cliente = c1.text_input("👤 Nome do Cliente")
-projeto = c2.text_input("📂 Nome do Projeto")
-n_opp = c3.text_input("🔢 Número da OPP")
+u_cliente = c1.text_input("👤 Cliente")
+u_projeto = c2.text_input("📂 Projeto")
+u_opp = c3.text_input("🔢 OPP")
 
-c4, c5, c6 = st.columns(3)
-produto = c4.text_input("📦 Produto")
-mercado = c5.text_input("🏭 Mercado")
-responsavel = c6.text_input("👨‍💻 Responsável")
+# Sidebar
+st.sidebar.header("🚀 Capacidade")
+solidos_dia = st.sidebar.number_input("Sólidos secos (t/dia)", value=100.0)
+utilizacao_pct = st.sidebar.slider("Disponibilidade (%)", 0, 100, 90)
+tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=45)
 
-st.markdown("---")
+st.sidebar.header("🧪 Processo")
+vazao_pico = st.sidebar.number_input("Vazão Pico (L/h)", value=50000.0)
+sg_solidos = st.sidebar.number_input("SG Sólidos", value=2.8)
+umidade_input = st.sidebar.number_input("Umidade (%)", value=20.0)
+recesso = st.sidebar.number_input("Recesso (mm)", value=30.0)
+pressao_manual = st.sidebar.slider("Pressão Filtração (Bar)", 1, 15, 7)
 
-# SIDEBAR (Todos os parâmetros de volta)
-st.sidebar.header("🚀 Capacidade & Ciclo")
-solidos_dia = st.sidebar.number_input("Sólidos secos/dia (ton/dia)", value=100.0)
-utilizacao_pct = st.sidebar.slider("Disponibilidade Operacional (%)", 0, 100, 90)
-tempo_cycle = st.sidebar.number_input("Tempo de Ciclo (min)", value=45)
-
-st.sidebar.header("🧪 Propriedades do Lodo")
-vazao_input = st.sidebar.number_input("Vazão de Pico (L/h)", value=50000.0)
-vol_lodo_dia = st.sidebar.number_input("Volume lodo/dia (m³/dia)", value=500.0)
-sg_solidos = st.sidebar.number_input("SG Sólidos Secos", value=2.8)
-umidade_input = st.sidebar.number_input("Umidade Torta (%)", value=20.0)
-recesso = st.sidebar.number_input("Espessura câmara (mm)", value=30.0)
-pressao_input = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 7)
-
-st.sidebar.header("💰 OPEX")
-custo_kwh = st.sidebar.number_input("Custo Energia (R$/kWh)", value=0.65)
-custo_lona_un = st.sidebar.number_input("Preço Lona (R$/unid)", value=450.0)
-vida_lona_ciclos = st.sidebar.number_input("Vida útil lona (Ciclos)", value=2000)
-
-# --- CÁLCULOS TÉCNICOS ---
+# Cálculos Base
 umidade = umidade_input / 100
 disp_h = 24 * (utilizacao_pct / 100)
 ciclos_dia = (disp_h * 60) / tempo_cycle if tempo_cycle > 0 else 0
 ciclos_mes = ciclos_dia * 30
-
 peso_torta_dia = solidos_dia / (1 - umidade) if (1-umidade) > 0 else 0
-massa_seco_ciclo = solidos_dia / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
-vol_total_L_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta) * 1000
+vol_req = (( (solidos_dia/ciclos_dia) / (1-umidade) ) / dens_torta) * 1000
 
-# Lógica de Modelos
+# Modelagem Micronics (8 modelos)
 tamanhos = [
-    {"nom": 1500, "area_ref": 4.50, "vol_ref": 70, "max": 120},
-    {"nom": 1200, "area_ref": 2.75, "vol_ref": 37, "max": 100},
-    {"nom": 1000, "area_ref": 1.95, "vol_ref": 25, "max": 90}
+    {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
+    {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
+    {"nom": 1500, "area_ref": 4.50, "vol_ref": 70,  "max": 120},
+    {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100},
+    {"nom": 1000, "area_ref": 1.95, "vol_ref": 25,  "max": 90},
+    {"nom": 800,  "area_ref": 1.15, "vol_ref": 14,  "max": 80},
+    {"nom": 630,  "area_ref": 0.65, "vol_ref": 8.5, "max": 60},
+    {"nom": 470,  "area_ref": 0.35, "vol_ref": 4.2, "max": 40},
 ]
+
 res_list = []
 for p in tamanhos:
-    vol_ajustado = p["vol_ref"] * (recesso / 30)
-    num_placas = math.ceil(vol_total_L_req / vol_ajustado) if vol_ajustado > 0 else 0
-    res_list.append({"Modelo (mm)": f"{p['nom']}x{p['nom']}", "Placas": num_placas, "Area": f"{num_placas * p['area_ref']:.1f}"})
+    v_adj = p["vol_ref"] * (recesso / 30)
+    n_placas = math.ceil(vol_req / v_adj) if v_adj > 0 else 0
+    if p["nom"] > 1000 and n_placas < 25: continue
+    status = "✅ OK" if n_placas <= p["max"] else "❌ Limite"
+    res_list.append({"Modelo (mm)": f"{p['nom']}x{p['nom']}", "Placas": n_placas, "Area": f"{n_placas * p['area_ref']:.1f}", "Status": status})
 
-# Lógica de Bomba (Pemo / Weir)
-if pressao_input <= 6:
-    marca, tipo = "PEMO (Itália)", "Série AO/AB - Centrífuga Revestida"
-else:
-    marca, tipo = "WEIR (Warman/GEHO)", "Série Warman AH ou GEHO ZPR"
+# Bomba
+if pressao_manual <= 6: marca, tipo = "PEMO (Itália)", "Série AO/AB"
+else: marca, tipo = "WEIR (Warman/GEHO)", "Série AH/ZPR"
 
-# --- EXIBIÇÃO ---
-k1, k2, k3, k4, k5 = st.columns(5)
-k1.metric("Peso Torta", f"{peso_torta_dia:.1f} t/d")
-k2.metric("Horas Úteis", f"{disp_h:.1f} h/d")
-k3.metric("Ciclos/Mês", f"{ciclos_mes:.0f}")
-k4.metric("Vol. Requerido", f"{vol_total_L_req:.0f} L")
-k5.metric("Pressão", f"{pressao_input} Bar")
+# Exibição
+k1, k2, k3 = st.columns(3)
+k1.metric("Ciclos/Mês", f"{ciclos_mes:.0f}")
+k2.metric("Vol. Torta/Ciclo", f"{vol_req:.0f} L")
+k3.metric("Bomba", marca)
 
-st.subheader("📋 Performance por Modelo")
+st.subheader("📋 Resultados de Dimensionamento")
 st.table(res_list)
 
-col_graf, col_bomba = st.columns([2, 1])
-with col_graf:
-    st.subheader("📊 Gráfico de Performance (Pressão x Vazão)")
-    fig, buf = gerar_grafico_vazao_pressao(pressao_input, vazao_input)
-    st.pyplot(fig)
+fig, buf = gerar_grafico_vazao_pressao(pressao_manual, vazao_pico)
+st.pyplot(fig)
 
-with col_bomba:
-    st.subheader("🛡️ Bomba Recomendada")
-    st.success(f"**Marca:** {marca}")
-    st.info(f"**Tipo:** {tipo}")
-    st.write(f"Vazão de Pico: {vazao_input:,.0f} L/h")
-
-st.markdown("---")
-if cliente and n_opp:
-    st.success("✅ Tudo pronto para o relatório!")
+if u_cliente and u_opp:
+    b_dados = {"marca": marca, "tipo": tipo, "pressao": pressao_manual, "vazao": vazao_pico}
+    pdf_b = gerar_pdf_estudo(u_cliente, u_opp, "Engenharia", res_list, {}, {}, b_dados, buf)
+    st.download_button("📄 Baixar Relatório V47", data=pdf_b, file_name=f"Estudo_{u_opp}.pdf")
 else:
-    st.warning("⚠️ Preencha os dados do cliente para habilitar o PDF.")
+    st.warning("Preencha Cliente e OPP para liberar o PDF.")
