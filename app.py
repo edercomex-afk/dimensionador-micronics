@@ -56,21 +56,19 @@ def gerar_pdf_final(d_cli, res_list, opex_detalhe, bomba, img_graf, diagnostico,
     pdf.ln(5)
     
     pdf.set_font("Arial", "B", 9)
-    # Bloco Cliente e Localização - Ordem Cidade / Estado
+    # Ordem Cidade / Estado / Contato
     pdf.cell(95, 7, clean_txt(f"Cliente: {d_cli['cliente']}"), 1)
     pdf.cell(95, 7, clean_txt(f"OPP: {d_cli['opp']}"), 1, ln=True)
     pdf.cell(63, 7, clean_txt(f"Cidade: {d_cli['cidade']}"), 1)
     pdf.cell(63, 7, clean_txt(f"Estado: {d_cli['estado']}"), 1)
     pdf.cell(64, 7, clean_txt(f"Contato: {d_cli['contato']}"), 1, ln=True)
-    
-    # Bloco Processo
     pdf.cell(63, 7, clean_txt(f"Material: {d_cli['produto']}"), 1)
     pdf.cell(63, 7, clean_txt(f"Mercado: {d_cli['mercado']}"), 1)
     pdf.cell(64, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
     pdf.ln(5)
 
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(190, 8, clean_txt(f"TAXA: {taxa:.1f} kg/m2.h | STATUS: {diagnostico}"), ln=True, fill=True)
+    pdf.cell(190, 8, clean_txt(f"TAXA CALCULADA: {taxa:.1f} kg/m2.h | STATUS: {diagnostico}"), ln=True, fill=True)
     pdf.ln(5)
 
     with open("temp_v550.png", "wb") as f: f.write(img_graf.getbuffer())
@@ -108,19 +106,13 @@ u_produto = c4.selectbox("**Material de Referencia**", sorted([
     "Litio", "Niquel", "Ouro", "Rejeito de Cobre", "Rejeito de Ferro", 
     "Rejeito de Grafite", "Rejeito de ouro", "Rejeito de terras raras", "Terras Raras"
 ]))
-u_mercado = c5.selectbox("**Mercado**", sorted([
-    "Alimentos", "Bebidas", "Farmáceutico", "Mineração", "Química"
-]))
+u_mercado = c5.selectbox("**Mercado**", sorted(["Alimentos", "Bebidas", "Farmáceutico", "Mineração", "Química"]))
 u_resp = c6.text_input("**Responsavel**")
 
-# Cabeçalho - Linha 3 (ORDEM ALTERADA: Cidade antes de Estado)
+# Cabeçalho - Linha 3 (Cidade antes de Estado)
 c7, c8, c9 = st.columns(3)
 u_cidade = c7.text_input("**Cidade**")
-u_estado = c8.selectbox("**Estado**", sorted([
-    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", 
-    "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", 
-    "SP", "SE", "TO"
-]))
+u_estado = c8.selectbox("**Estado**", sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]))
 u_contato = c9.text_input("**Contato**")
 
 # Sidebar
@@ -170,35 +162,30 @@ area_sel = res_list[0]["Area"] if res_list else 1
 taxa_calc = massa_seco_ciclo / (area_sel * (tempo_cycle / 60))
 status_t, msg_t, cor_t = validar_taxa(taxa_calc, u_produto)
 
-energia_mes = (20 * disp_h * 30) * custo_kwh
-n_placas_ref = res_list[0]["Placas"] if res_list else 0
-lonas_mes = ((ciclos_dia * 30) / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un
-total_opex = energia_mes + lonas_mes
-marca_bomba = "PEMO (Italia)" if pressao_manual <= 6 else "WEIR (Warman/GEHO)"
-
 # EXIBIÇÃO
 st.table(res_list)
 st.markdown(f"### Diagnostico para {u_produto}: :{cor_t}[{status_t}] - {taxa_calc:.1f} kg/m2.h")
+st.info(msg_t)
 
 col_g, col_o = st.columns([2, 1])
 with col_g:
     buf = gerar_grafico(pressao_manual, vazao_pico)
     st.image(buf)
 with col_o:
+    energia_mes = (20 * disp_h * 30) * custo_kwh
+    n_placas_ref = res_list[0]["Placas"] if res_list else 0
+    lonas_mes = (((ciclos_dia * 30) / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un) if vida_lona_ciclos > 0 else 0
     st.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
     st.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
-    st.success(f"💰 Total OPEX: R$ {total_opex:,.2f}")
+    st.success(f"💰 Total OPEX: R$ {(energia_mes + lonas_mes):,.2f}")
+    marca_bomba = "PEMO (Italia)" if pressao_manual <= 6 else "WEIR (Warman/GEHO)"
     st.markdown(f"**Bomba:** {marca_bomba}")
 
 st.markdown("---")
 if st.button("📄 Gerar Relatorio Tecnico PDF"):
     if u_cliente and u_opp and u_resp:
-        d_c = {
-            "cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, 
-            "resp": u_resp, "produto": u_produto, "mercado": u_mercado, 
-            "estado": u_estado, "cidade": u_cidade, "contato": u_contato
-        }
-        pdf_b = gerar_pdf_final(d_c, res_list, {"total": total_opex}, marca_bomba, buf, status_t, taxa_calc)
+        d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto, "mercado": u_mercado, "estado": u_estado, "cidade": u_cidade, "contato": u_contato}
+        pdf_b = gerar_pdf_final(d_c, res_list, {"total": energia_mes + lonas_mes}, marca_bomba, buf, status_t, taxa_calc)
         st.download_button("⬇️ Baixar Estudo", data=pdf_b, file_name=f"Estudo_Micronics_{u_opp}.pdf")
     else:
         st.error("Preencha os campos obrigatórios no cabeçalho.")
