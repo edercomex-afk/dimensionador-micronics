@@ -30,52 +30,50 @@ def main():
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("Cidade", value="São Paulo")
-    estado = st.sidebar.selectbox("Estado", estados_br, index=24) # SP Padrão
+    estado = st.sidebar.selectbox("Estado", estados_br, index=24)
 
     st.sidebar.divider()
     st.sidebar.header("📥 Parâmetros de Processo")
-    
-    # Adicionado o box para Massa Seca (t/Dia) conforme solicitado
     prod_seca_dia = st.sidebar.number_input("Massa Seca (t/Dia)", value=240.0)
     prod_seca_hora = st.sidebar.number_input("Massa Seca (t/h)", value=10.0)
     
-    # Disponibilidade em barras ajustáveis (Slider)
-    disponibilidade_h = st.sidebar.slider("Disponibilidade de Equipamento (h/dia)", 1, 24, 20)
+    # Adicionado Volume de lodo/dia conforme solicitado
+    vol_lodo_dia_input = st.sidebar.number_input("Volume de lodo/dia (m³)", value=500.0)
     
+    disponibilidade_h = st.sidebar.slider("Disponibilidade de Equipamento (h/dia)", 1, 24, 20)
     conc_solidos = st.sidebar.number_input("Conc. Sólidos (%w/w)", value=30.0)
     
     st.sidebar.divider()
     st.sidebar.header("🧬 Densidade e Geometria")
     sg_solido = st.sidebar.number_input("SG Sólido (g/cm³)", value=2.70, format="%.2f")
-    
-    # Espessura da Câmara liberada para inserir valores
     espessura_camara = st.sidebar.number_input("Espessura da Câmara (mm)", value=40, step=1)
     
     st.sidebar.divider()
     st.sidebar.header("🔄 Ciclos e Operação")
     vida_util_lona = st.sidebar.number_input("Vida Útil da Lona (Ciclos)", value=2000)
     tempo_ciclo_min = st.sidebar.number_input("Tempo de Ciclo (min)", value=60)
+    
+    # Adicionado campo para Quilovates no ciclo de operação
+    kwh_ciclo = st.sidebar.number_input("Consumo Elétrico por Ciclo (kWh)", value=45.0)
+    
     pressao_operacao = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
 
     # --- NÚCLEO DE CÁLCULO ---
-    # Gravidade específica do lodo
     sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos))
-    
-    # Taxa de fluxo de lodo m³/h e Volume Dia
     massa_polpa_hora = prod_seca_hora / (conc_solidos / 100)
     taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo
-    vol_lodo_dia = taxa_fluxo_lodo_m3h * disponibilidade_h
+    vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
     vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
     
-    # Ciclos
     ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min
     trocas_lona_ano = (ciclos_dia * 365) / vida_util_lona
+    consumo_diario_kwh = ciclos_dia * kwh_ciclo
 
     # --- CAIXAS DE RESUMO (CARDS) ---
-    st.write(f"### 🚀 Resumo Operacional: {nome_projeto} (OPP: {num_opp})")
+    st.write(f"### 🚀 Resumo Operacional: {nome_projeto}")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.info(f"**Volume Lodo/Dia**\n\n {vol_lodo_dia:.2f} m³/dia")
+        st.info(f"**Vol. Lodo/Dia (Calc)**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
     with c2:
         st.info(f"**Taxa Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
     with c3:
@@ -87,7 +85,6 @@ def main():
 
     # --- TABELA DE SELEÇÃO DE FILTROS ---
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 
-    
     mapa_filtros = [
         {"Modelo": "800mm", "Vol_Placa": 15, "Area_Placa": 1.1},
         {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
@@ -112,12 +109,11 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📈 OPEX & Performance"])
 
     with tab1:
-        st.write(f"**Empresa:** {empresa} | **Local:** {cidade}/{estado}")
-        st.write(f"**Massa Seca Diária:** {prod_seca_dia} t/Dia")
+        st.write(f"**Empresa:** {empresa} | **Massa Seca Diária:** {prod_seca_dia} t/Dia")
+        st.write(f"**Volume de lodo informado:** {vol_lodo_dia_input} m³/dia")
         st.table(pd.DataFrame(selecao_final))
-        
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.success(f"Hardware Sugerido: Bomba **{tipo_bomba}** para operação em {pressao_operacao} Bar.")
+        st.success(f"Hardware Sugerido: Bomba **{tipo_bomba}**.")
 
     with tab2:
         col_opex1, col_opex2 = st.columns(2)
@@ -125,16 +121,9 @@ def main():
             st.subheader("Manutenção e Ciclos")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Trocas de Lona/Ano:** {trocas_lona_ano:.2f}")
-            
-            # Gráfico Farol
-            fig, ax = plt.subplots(figsize=(6, 2))
-            t_ref = selecao_final[2]["Taxa (kg/m².h)"]
-            ax.barh(["Taxa"], [t_ref], color='green' if t_ref < 300 else 'orange')
-            ax.set_xlim(0, 600)
-            st.pyplot(fig)
-            
+            st.write(f"**Consumo Estimado:** {consumo_diario_kwh:.2f} kWh/dia")
         with col_opex2:
-            st.subheader("Custos Estimados")
+            st.subheader("Composição de Custos")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
             ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Peças'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
             st.pyplot(fig2)
