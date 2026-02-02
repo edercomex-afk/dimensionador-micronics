@@ -11,9 +11,15 @@ def main():
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
-    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia</p>
+    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia | Responsável: Eder</p>
     </div>
     """, unsafe_allow_html=True)
+
+    # Lista de Estados do Brasil
+    estados_br = [
+        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
+        "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+    ]
 
     # --- SIDEBAR (IDENTIFICAÇÃO E PROCESSO) ---
     st.sidebar.header("📋 Identificação do Projeto")
@@ -24,20 +30,23 @@ def main():
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("Cidade", value="São Paulo")
-    estado = col_est.text_input("Estado", value="SP")
+    estado = col_est.selectbox("Estado", estados_br, index=24) # SP como padrão
 
     st.sidebar.divider()
     st.sidebar.header("📥 Parâmetros de Processo")
     prod_seca = st.sidebar.number_input("Massa Seca (t/h)", value=10.0)
-    # Alterado para Disponibilidade do Equipamento conforme pedido
-    disponibilidade_h = st.sidebar.number_input("Disponibilidade de Equipamento (h/dia)", value=20)
+    
+    # Disponibilidade em barras ajustáveis (Slider)
+    disponibilidade_h = st.sidebar.slider("Disponibilidade de Equipamento (h/dia)", 1, 24, 20)
+    
     conc_solidos = st.sidebar.number_input("Conc. Sólidos (%w/w)", value=30.0)
     
     st.sidebar.divider()
     st.sidebar.header("🧬 Densidade e Geometria")
     sg_solido = st.sidebar.number_input("SG Sólido (g/cm³)", value=2.70, format="%.2f")
-    # Restaurada a Espessura da Câmara
-    espessura_camara = st.sidebar.selectbox("Espessura da Câmara (mm)", [30, 40, 50, 60], index=1)
+    
+    # Espessura da Câmara liberada para inserir valores (number_input)
+    espessura_camara = st.sidebar.number_input("Espessura da Câmara (mm)", value=40, step=1)
     
     st.sidebar.divider()
     st.sidebar.header("🔄 Ciclos e Operação")
@@ -46,7 +55,7 @@ def main():
     pressao_operacao = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
 
     # --- NÚCLEO DE CÁLCULO ---
-    # Gravidade específica do lodo (SG Polpa)
+    # Gravidade específica do lodo
     sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos))
     
     # Taxa de fluxo de lodo m³/h e Volume Dia
@@ -59,8 +68,8 @@ def main():
     ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min
     trocas_lona_ano = (ciclos_dia * 365) / vida_util_lona
 
-    # --- CAIXAS DE RESUMO (CARDS DE DESTAQUE) ---
-    st.write(f"### 🚀 Resumo Operacional: {nome_projeto}")
+    # --- CAIXAS DE RESUMO (CARDS) ---
+    st.write(f"### 🚀 Resumo Operacional: {nome_projeto} (OPP: {num_opp})")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.info(f"**Volume Lodo/Dia**\n\n {vol_lodo_dia:.2f} m³/dia")
@@ -69,14 +78,12 @@ def main():
     with c3:
         st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
     with c4:
-        # Alterado para Gravidade específica do lodo conforme pedido
         st.info(f"**Grav. Específica Lodo**\n\n {sg_lodo:.3f}")
 
     st.divider()
 
     # --- TABELA DE SELEÇÃO DE FILTROS ---
-    # O volume da torta por ciclo depende da espessura da câmara selecionada
-    # SG Torta fixo 1.8 para cálculo de volume físico
+    # Volume de torta por ciclo (SG Torta fixo 1.8)
     vol_torta_ciclo_m3 = (prod_seca * (tempo_ciclo_min/60)) / 1.8 
     
     mapa_filtros = [
@@ -89,8 +96,6 @@ def main():
 
     selecao_final = []
     for f in mapa_filtros:
-        # Ajuste conceitual: Volume por placa varia levemente com a espessura, 
-        # aqui mantemos a base da V53
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"])
         area_total = num_placas * f["Area_Placa"]
         taxa_filt = (prod_seca * 1000) / area_total
@@ -105,8 +110,8 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📈 OPEX & Performance"])
 
     with tab1:
-        st.write(f"**Cliente:** {empresa} | **Espessura da Câmara:** {espessura_camara} mm")
-        st.write("### Dimensionamento de Ativos")
+        st.write(f"**Empresa:** {empresa} | **Localidade:** {cidade}/{estado}")
+        st.write(f"**Espessura de Câmara Definida:** {espessura_camara} mm")
         st.table(pd.DataFrame(selecao_final))
         
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
@@ -115,11 +120,11 @@ def main():
     with tab2:
         col_opex1, col_opex2 = st.columns(2)
         with col_opex1:
-            st.subheader("Ciclos e Vida Útil")
+            st.subheader("Manutenção de Lonas")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Trocas de Lona/Ano:** {trocas_lona_ano:.2f}")
             
-            # Gráfico de Farol Horizontal
+            # Gráfico Farol
             fig, ax = plt.subplots(figsize=(6, 2))
             t_ref = selecao_final[2]["Taxa (kg/m².h)"]
             ax.barh(["Taxa"], [t_ref], color='green' if t_ref < 300 else 'orange')
@@ -127,9 +132,9 @@ def main():
             st.pyplot(fig)
             
         with col_opex2:
-            st.subheader("Composição de Custos")
+            st.subheader("Custos Estimados")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
-            ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
+            ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Peças'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
             st.pyplot(fig2)
 
 if __name__ == "__main__":
