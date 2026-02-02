@@ -7,7 +7,7 @@ import math
 st.set_page_config(page_title="Dimensionador Micronics V53", layout="wide")
 
 def main():
-    # Cabeçalho Técnico Restaurado (Versão Eder)
+    # Cabeçalho Técnico (Banner Azul)
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
@@ -15,7 +15,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SIDEBAR (INPUTS ORIGINAIS V53) ---
+    # --- SIDEBAR (INPUTS ORIGINAIS) ---
     st.sidebar.header("📥 Parâmetros de Processo")
     prod_seca = st.sidebar.number_input("Massa Seca (t/h)", value=10.0)
     horas_op = st.sidebar.number_input("Operação (h/dia)", value=20)
@@ -31,28 +31,36 @@ def main():
     st.sidebar.header("⚙️ Operação")
     pressao_operacao = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
 
-    # --- NÚCLEO DE CÁLCULO (BALANÇO HIDRÁULICO) ---
-    # Densidade da polpa (Considerando SG Água = 1.0 fixo internamente)
+    # --- NÚCLEO DE CÁLCULO ---
+    # Densidade da polpa
     rho_polpa = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos))
     
-    # Taxa de fluxo de lodo m³/h
+    # Taxa de fluxo de lodo m³/h e Volume Dia
     massa_polpa_hora = prod_seca / (conc_solidos / 100)
     taxa_fluxo_lodo_m3h = massa_polpa_hora / rho_polpa
-    
-    # Volume de lodo por dia
     vol_lodo_dia = taxa_fluxo_lodo_m3h * horas_op
-    
-    # Vazão de Pico (L/h)
     vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
     
-    # Ciclos da lona
+    # Ciclos
     ciclos_dia = (horas_op * 60) / tempo_ciclo_min
     trocas_lona_ano = (ciclos_dia * 365) / vida_util_lona
 
-    # --- TABELA DE SELEÇÃO DE FILTROS (CENTRAL) ---
-    # Baseado no volume de torta necessário por ciclo
-    vol_torta_ciclo_m3 = (prod_seca * (tempo_ciclo_min/60)) / 1.8 # SG Torta médio fixo 1.8 para seleção
+    # --- NOVAS CAIXAS DE CABEÇALHO (CARDS DE DESTAQUE) ---
+    st.write("### 🚀 Resumo Operacional")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.info(f"**Volume Lodo/Dia**\n\n {vol_lodo_dia:.2f} m³/dia")
+    with c2:
+        st.info(f"**Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
+    with c3:
+        st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
+    with c4:
+        st.info(f"**SG Polpa**\n\n {rho_polpa:.3f} g/cm³")
 
+    st.divider()
+
+    # --- TABELA DE SELEÇÃO DE FILTROS ---
+    vol_torta_ciclo_m3 = (prod_seca * (tempo_ciclo_min/60)) / 1.8 
     mapa_filtros = [
         {"Modelo": "800mm", "Vol_Placa": 15, "Area_Placa": 1.1},
         {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
@@ -73,50 +81,35 @@ def main():
             "Taxa (kg/m².h)": round(taxa_filt, 2)
         })
 
-    # --- EXPOSIÇÃO DOS DADOS NO LAYOUT ---
-    tab1, tab2, tab3 = st.tabs(["📋 Seleção de Filtro", "📈 OPEX & Performance", "📖 Memorial"])
+    # --- LAYOUT DE ABAS ---
+    tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📈 OPEX & Performance"])
 
     with tab1:
-        st.subheader("Resultados de Fluxo e Seleção de Ativos")
-        
-        # Métricas em destaque conforme solicitado
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Volume de Lodo/Dia", f"{vol_lodo_dia:.2f} m³/dia")
-        c2.metric("Taxa Fluxo Lodo", f"{taxa_fluxo_lodo_m3h:.2f} m³/h")
-        c3.metric("Vazão de Pico", f"{vazao_pico_lh:,.0f} L/h")
-        
-        st.write("### Tabela de Dimensionamento de Placas")
+        st.write("### Dimensionamento de Ativos")
         st.table(pd.DataFrame(selecao_final))
         
-        st.divider()
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.info(f"Bomba Sugerida: **{tipo_bomba}** para operação em {pressao_operacao} Bar.")
+        st.success(f"Hardware Sugerido: Bomba **{tipo_bomba}** para operação em {pressao_operacao} Bar.")
 
     with tab2:
         col_opex1, col_opex2 = st.columns(2)
         with col_opex1:
             st.subheader("Vida Útil da Lona")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
-            st.write(f"**Trocas de Lona/Ano:** {trocas_lona_ano:.2f}")
+            st.write(f"**Trocas Anuais Estimadas:** {trocas_lona_ano:.2f}")
             
-            # Farol de Performance
+            # Gráfico de Farol Horizontal
             fig, ax = plt.subplots(figsize=(6, 2))
-            taxa_plot = selecao_final[1]["Taxa (kg/m².h)"] # Referência modelo 1000mm
-            ax.barh(["Taxa Filtração"], [taxa_plot], color='green' if taxa_plot < 300 else 'orange')
+            t_ref = selecao_final[2]["Taxa (kg/m².h)"]
+            ax.barh(["Taxa"], [t_ref], color='green' if t_ref < 300 else 'orange')
             ax.set_xlim(0, 600)
             st.pyplot(fig)
             
         with col_opex2:
-            st.subheader("Estimativa de OPEX")
+            st.subheader("Composição de Custos")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
-            ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Peças'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
+            ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
             st.pyplot(fig2)
-
-    with tab3:
-        st.subheader("Memória de Cálculo")
-        st.latex(r"Vol_{dia} = Fluxo_{m3/h} \cdot Horas_{op}")
-        st.latex(r"Q_{pico} (L/h) = (Fluxo_{m3/h} \cdot 1000) \cdot 1.3")
-        st.latex(r"SG_{polpa} = \frac{100}{\frac{C_w}{SG_s} + (100 - C_w)}")
 
 if __name__ == "__main__":
     main()
