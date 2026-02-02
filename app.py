@@ -6,14 +6,13 @@ from fpdf import FPDF
 import io
 
 # 1. Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V54.4 Full", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V54.5 Full", layout="wide")
 
 # --- FUNÇÕES AUXILIARES ---
 def clean_txt(text):
     return str(text).encode('latin-1', 'ignore').decode('latin-1')
 
 def validar_taxa(taxa_calc, material_selecionado):
-    # Referências técnicas de Taxa de Filtração (kg/m2.h)
     referencias = {
         "Ferro": 450, "Cobre": 300, "Niquel": 250, "Ouro": 200,
         "Litio": 120, "Terras Raras": 100, "Lama Vermelha": 60,
@@ -54,14 +53,15 @@ def gerar_pdf_final(d_cli, res_list, opex_detalhe, bomba, img_graf, diagnostico,
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(190, 10, clean_txt("ESTUDO TECNICO DE FILTRACAO - V54.4"), ln=True, align="C")
+    pdf.cell(190, 10, clean_txt("ESTUDO TECNICO DE FILTRACAO - V54.5"), ln=True, align="C")
     pdf.ln(5)
     
     pdf.set_font("Arial", "B", 10)
     pdf.cell(95, 7, clean_txt(f"Cliente: {d_cli['cliente']}"), 1)
     pdf.cell(95, 7, clean_txt(f"OPP: {d_cli['opp']}"), 1, ln=True)
-    pdf.cell(95, 7, clean_txt(f"Material: {d_cli['produto']}"), 1)
-    pdf.cell(95, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
+    pdf.cell(63, 7, clean_txt(f"Material: {d_cli['produto']}"), 1)
+    pdf.cell(63, 7, clean_txt(f"Mercado: {d_cli['mercado']}"), 1)
+    pdf.cell(64, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
     pdf.ln(5)
 
     pdf.set_fill_color(240, 240, 240)
@@ -83,12 +83,12 @@ def gerar_pdf_final(d_cli, res_list, opex_detalhe, bomba, img_graf, diagnostico,
     
     pdf.ln(10)
     pdf.set_font("Arial", "B", 10)
-    pdf.cell(190, 8, clean_txt(f"OPEX Total: R$ {opex_detalhe['total']:,.2f}/mes"), ln=True)
-    pdf.cell(190, 8, clean_txt(f"Bomba: {bomba}"), ln=True)
+    pdf.cell(190, 8, clean_txt(f"OPEX Total Estimado: R$ {opex_detalhe['total']:,.2f}/mes"), ln=True)
+    pdf.cell(190, 8, clean_txt(f"Bomba Recomendada: {bomba}"), ln=True)
     return pdf.output(dest="S").encode("latin-1", "ignore")
 
 # --- INTERFACE ---
-st.title("Cleanova Micronics | Dimensionador V54.4")
+st.title("Cleanova Micronics | Dimensionador V54.5")
 
 # Cabeçalho
 c1, c2, c3 = st.columns(3)
@@ -97,13 +97,15 @@ u_projeto = c2.text_input("**Projeto**")
 u_opp = c3.text_input("**Numero da OPP**")
 
 c4, c5, c6 = st.columns(3)
-# Lista de materiais expandida
 u_produto = c4.selectbox("**Material de Referencia**", [
     "Ouro", "Ferro", "Cobre", "Lama Vermelha", "Litio", "Niquel", "Terras Raras", 
     "Rejeito de Ferro", "Rejeito de Cobre", "Rejeito de ouro", 
     "Rejeito de terras raras", "Efluente industrial"
 ])
-u_mercado = c5.text_input("**Mercado**")
+# ABA MERCADO ATUALIZADA
+u_mercado = c5.selectbox("**Mercado**", [
+    "Mineração", "Química", "Bebidas", "Alimentos", "Farmáceutico"
+])
 u_resp = c6.text_input("**Responsavel**")
 
 # Sidebar
@@ -178,7 +180,7 @@ with col_o:
 st.markdown("---")
 if st.button("📄 Gerar Relatorio Tecnico PDF"):
     if u_cliente and u_opp and u_resp:
-        d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto}
+        d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto, "mercado": u_mercado}
         pdf_b = gerar_pdf_final(d_c, res_list, {"total": total_opex}, marca_bomba, buf, status_t, taxa_calc)
         st.download_button("⬇️ Baixar Estudo", data=pdf_b, file_name=f"Estudo_Micronics_{u_opp}.pdf")
     else:
