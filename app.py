@@ -11,11 +11,22 @@ def main():
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
-    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia | Responsável: Eder</p>
+    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SIDEBAR (INPUTS ORIGINAIS) ---
+    # --- SIDEBAR (INPUTS DE IDENTIFICAÇÃO E PROCESSO) ---
+    st.sidebar.header("📋 Identificação do Projeto")
+    nome_projeto = st.sidebar.text_input("Nome do Projeto", value="Projeto Exemplo")
+    num_opp = st.sidebar.text_input("N° de OPP", value="000/2026")
+    empresa = st.sidebar.text_input("Empresa", value="Cliente S/A")
+    responsavel = st.sidebar.text_input("Responsável pelo Projeto", value="Eder")
+    
+    col_cid, col_est = st.sidebar.columns(2)
+    cidade = col_cid.text_input("Cidade", value="São Paulo")
+    estado = col_est.text_input("Estado", value="SP")
+
+    st.sidebar.divider()
     st.sidebar.header("📥 Parâmetros de Processo")
     prod_seca = st.sidebar.number_input("Massa Seca (t/h)", value=10.0)
     horas_op = st.sidebar.number_input("Operação (h/dia)", value=20)
@@ -45,8 +56,8 @@ def main():
     ciclos_dia = (horas_op * 60) / tempo_ciclo_min
     trocas_lona_ano = (ciclos_dia * 365) / vida_util_lona
 
-    # --- NOVAS CAIXAS DE CABEÇALHO (CARDS DE DESTAQUE) ---
-    st.write("### 🚀 Resumo Operacional")
+    # --- CAIXAS DE RESUMO (CARDS DE DESTAQUE) ---
+    st.write(f"### 🚀 Resumo Operacional: {nome_projeto} (OPP: {num_opp})")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.info(f"**Volume Lodo/Dia**\n\n {vol_lodo_dia:.2f} m³/dia")
@@ -85,6 +96,7 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📈 OPEX & Performance"])
 
     with tab1:
+        st.write(f"**Cliente:** {empresa} | **Local:** {cidade}/{estado}")
         st.write("### Dimensionamento de Ativos")
         st.table(pd.DataFrame(selecao_final))
         
