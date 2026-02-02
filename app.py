@@ -1,121 +1,104 @@
 import streamlit as st
-import math
 
-# Configuração da página
+# Configuração da página para aproveitar o espaço
 st.set_page_config(page_title="Dimensionador Cleanova Micronics V55", layout="wide")
 
 def main():
-    st.title("🏗️ Dimensionador Industrial - Cleanova Micronics")
-    st.markdown(f"**Engenheiro Responsável:** Eder")
+    st.title("🏗️ Dimensionador Industrial V55 - Cleanova Micronics")
+    st.subheader(f"Responsável Técnico: Eder")
     st.divider()
 
-    # --- ENTRADA DE DADOS (SIDEBAR) ---
-    st.sidebar.header("📥 Parâmetros de Entrada")
+    # --- SEÇÃO 1: ENTRADA DE DADOS COMPLETA ---
+    st.header("1. Parâmetros de Entrada de Processo")
     
-    # Produção e Processo
-    prod_seca_ton = st.sidebar.number_input("Produção de Sólidos Secos (ton/h)", value=10.0, step=0.5)
-    conc_solidos_w = st.sidebar.number_input("Concentração de Sólidos na Polpa (% w/w)", value=30.0, step=1.0)
-    horas_op = st.sidebar.number_input("Horas de Operação por Dia (h)", value=20, step=1)
+    col1, col2, col3 = st.columns(3)
     
-    # Densidades
-    rho_solido = st.sidebar.number_input("Densidade do Sólido (t/m³)", value=2.7, step=0.1)
-    rho_liquido = st.sidebar.number_input("Densidade do Líquido (t/m³)", value=1.0, step=0.01)
-    
-    # Parâmetros de Filtração
-    pressao_target = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
-    area_filtracao = st.sidebar.number_input("Área de Filtração do Filtro (m²)", value=150.0, step=10.0)
+    with col1:
+        st.markdown("### 📊 Produção")
+        prod_seca = st.number_input("Produção de Sólidos Secos (ton/h)", value=10.0)
+        horas_op = st.number_input("Horas de Operação por Dia (h/dia)", value=20)
+        conc_solidos = st.number_input("Concentração de Sólidos na Polpa (% w/w)", value=30.0)
 
-    # --- NÚCLEO DE CÁLCULO (MEMÓRIA TÉCNICA) ---
-    
-    # 1. Densidade da Polpa (Mistura)
-    # Formula: 100 / ((%S / RhoS) + (%L / RhoL))
-    rho_polpa = 100 / ((conc_solidos_w / rho_solido) + ((100 - conc_solidos_w) / rho_liquido))
-    
-    # 2. Volume de Lodo por Hora (m³/h)
-    # Volume = Massa / (Densidade * Concentração)
-    vol_lodo_hora = prod_seca_ton / (rho_polpa * (conc_solidos_w / 100))
-    
-    # 3. Volume de Lodo por Dia (m³/dia) - Requisito Eder
-    vol_lodo_dia = vol_lodo_hora * horas_op
-    
-    # 4. Vazão de Pico (L/h) - Abaixo da unidade conforme solicitado
-    # Considerando fator de pico para enchimento rápido (30% de margem)
-    vazao_pico_lh = (vol_lodo_hora * 1000) * 1.3
+    with col2:
+        st.markdown("### 🧬 Densidades")
+        rho_solido = st.number_input("Densidade do Sólido (t/m³)", value=2.70)
+        rho_liquido = st.number_input("Densidade do Líquido (t/m³)", value=1.00)
+        rho_torta = st.number_input("Densidade da Torta Formada (t/m³)", value=1.80)
 
-    # 5. Taxa de Filtração Específica (kg/m².h)
-    taxa_especifica = (prod_seca_ton * 1000) / area_filtracao
-
-    # --- EXPOSIÇÃO DOS RESULTADOS ---
-    
-    col_res1, col_res2 = st.columns(2)
-
-    with col_res1:
-        st.subheader("💧 Balanço Hidráulico")
-        container_h = st.container(border=True)
-        container_h.metric("Volume de Lodo por Dia", f"{vol_lodo_dia:.2f} m³/dia")
-        container_h.metric("Vazão de Pico", f"{vazao_pico_lh:,.2f} L/h")
-        container_h.write(f"**Densidade da Polpa:** {rho_polpa:.3f} t/m³")
-
-    with col_res2:
-        st.subheader("⚙️ Performance do Equipamento")
-        container_p = st.container(border=True)
-        container_p.metric("Taxa de Filtração", f"{taxa_especifica:.2f} kg/m².h")
-        
-        # Lógica do Farol (Sinalizador)
-        limite_referencia = 300 # Exemplo para Concentrado (pode ser dinâmico)
-        porcentagem_limite = (taxa_especifica / limite_referencia) * 100
-
-        if porcentagem_limite <= 100:
-            st.success("Sinalizador: VERDE (Operação Segura)")
-        elif porcentagem_limite <= 130:
-            st.warning("Sinalizador: AMARELO (Operação Agressiva)")
-        else:
-            st.error("Sinalizador: VERMELHO (Risco de Sobrecarga)")
+    with col3:
+        st.markdown("### 📐 Equipamento")
+        area_filtracao = st.number_input("Área de Filtração Total (m²)", value=150.0)
+        pressao_operacao = st.slider("Pressão de Filtração (Bar)", 1, 15, 6)
+        t_ciclo_min = st.number_input("Tempo de Ciclo Estimado (min)", value=60)
 
     st.divider()
 
-    # --- ESPECIFICAÇÃO DE BOMBAS ---
-    st.subheader("Pump Selector: Definição de Hardware")
+    # --- SEÇÃO 2: MEMÓRIA DE CÁLCULO (BACKEND) ---
     
-    c1, c2 = st.columns(2)
-    with c1:
-        if pressao_target <= 6:
-            st.info("### Bomba Selecionada: **PEMO**")
-            st.write("""
-            - **Tipo:** Centrífuga com revestimento em borracha.
-            - **Justificativa:** Pressão dentro do limite de vulcanização. 
-            - **Vantagem:** Alta resistência à abrasão e vazão de pico estável.
-            """)
-        else:
-            st.info("### Bomba Selecionada: **WARMAN / WEIR**")
-            st.write("""
-            - **Tipo:** Bomba de Polpa Heavy Duty.
-            - **Justificativa:** Pressão acima de 6 Bar exige carcaça metálica/reforçada.
-            - **Vantagem:** Vence a perda de carga final do ciclo da torta.
-            """)
-            
-    with c2:
-        st.write("**Resumo Técnico para GitHub:**")
-        st.code(f"""
-        # Dados de Dimensionamento
-        VOL_DIA = {vol_lodo_dia:.2f} m3
-        VAZAO_PICO = {vazao_pico_lh:.2f} L/h
-        PRESSAO = {pressao_target} Bar
-        BOMBA = {"PEMO" if pressao_target <= 6 else "WARMAN"}
-        """, language='python')
+    # Cálculo da Densidade da Polpa
+    rho_polpa = 100 / ((conc_solidos / rho_solido) + ((100 - conc_solidos) / rho_liquido))
+    
+    # Cálculo do Balanço de Massa por Hora
+    massa_polpa_hora = prod_seca / (conc_solidos / 100)
+    vol_polpa_hora = massa_polpa_hora / rho_polpa
+    
+    # Unidades Críticas solicitadas pelo Eder
+    vol_lodo_dia = vol_polpa_hora * horas_op
+    vazao_pico_lh = (vol_polpa_hora * 1000) * 1.3  # Fator de segurança de 30% para pico de enchimento
+    
+    # Cálculo de Performance
+    taxa_especifica = (prod_seca * 1000) / area_filtracao
 
-    # --- MEMORIAL DE CÁLCULO (EXPANDER) ---
-    with st.expander("📖 Ver Detalhamento de Fórmulas e Relacionamentos"):
-        st.markdown("### Fórmulas Aplicadas no Dimensionamento:")
-        st.latex(r"V_{dia} = \left( \frac{M_{seca}}{\rho_{polpa} \cdot C_w} \right) \cdot H_{op}")
-        st.latex(r"Q_{pico} (L/h) = (V_{hora} \cdot 1000) \cdot 1.3")
-        st.latex(r"T_{esp} = \frac{M_{seca} \cdot 1000}{A}")
-        st.markdown("""
-        ---
-        **Riscos de Dados Incorretos:**
-        1. **Densidade Errada:** Impacta diretamente no volume total diário, podendo causar subdimensionamento da frota de filtros.
-        2. **% Sólidos Baixo:** Aumenta a vazão de pico, podendo causar cavitação na bomba selecionada.
-        """)
+    # --- SEÇÃO 3: EXPOSIÇÃO DETALHADA DE RESULTADOS ---
+    st.header("2. Resultados do Dimensionamento")
+
+    # Bloco Hidráulico em Destaque
+    st.info("### 💧 Balanço Hidráulico e Fluxo")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Volume de Lodo por Dia", f"{vol_lodo_dia:.2f} m³/dia")
+    c2.metric("Vazão de Pico", f"{vazao_pico_lh:,.2f} L/h")
+    c3.metric("Densidade da Polpa", f"{rho_polpa:.3f} t/m³")
+
+    # Bloco de Performance
+    st.success("### ⚙️ Performance e Capacidade")
+    p1, p2, p3 = st.columns(3)
+    p1.metric("Taxa de Filtração", f"{taxa_especifica:.2f} kg/m².h")
+    p2.metric("Massa de Polpa total", f"{massa_polpa_hora:.2f} t/h")
+    p3.metric("Volume de Polpa total", f"{vol_polpa_hora:.2f} m³/h")
+
+    st.divider()
+
+    # --- SEÇÃO 4: DEFINIÇÃO DE HARDWARE (BOMBAS) ---
+    st.header("3. Especificação Técnica de Bombas")
+    
+    b1, b2 = st.columns(2)
+    
+    with b1:
+        if pressao_operacao <= 6:
+            st.markdown("#### ✅ Bomba Recomendada: **PEMO**")
+            st.write("**Tipo:** Centrífuga revestida em borracha.")
+            st.write(f"**Vazão de Projeto:** {vazao_pico_lh:,.0f} L/h para operar até {pressao_operacao} Bar.")
+        else:
+            st.markdown("#### ✅ Bomba Recomendada: **WARMAN / WEIR**")
+            st.write("**Tipo:** Revestimento metálico ou borracha de alta pressão.")
+            st.write(f"**Vazão de Projeto:** {vazao_pico_lh:,.0f} L/h para suportar {pressao_operacao} Bar.")
+
+    with b2:
+        st.markdown("#### 🚩 Alertas de Risco")
+        if taxa_especifica > 450:
+            st.error("ALERTA: Taxa acima do limite para Minério de Ferro!")
+        elif taxa_especifica > 300:
+            st.warning("ALERTA: Operação em zona crítica (Amarelo).")
+        else:
+            st.info("Operação dentro dos limites normais de filtrabilidade.")
+
+    # --- SEÇÃO 5: MEMORIAL DE FÓRMULAS (PARA GITHUB) ---
+    with st.expander("📚 Memorial Descritivo de Cálculos (LaTeX)"):
+        st.write("Todos os cálculos seguem as normas da Cleanova Micronics:")
+        st.latex(r"V_{dia} = \frac{M_{seca}}{\rho_{polpa} \cdot C_w} \cdot H_{op}")
+        st.latex(r"Q_{pico} (L/h) = (V_{polpa/hora} \cdot 1000) \cdot 1.3")
+        st.latex(r"\rho_{polpa} = \frac{100}{\frac{C_w}{\rho_{s}} + \frac{100 - C_w}{\rho_{l}}}")
+        st.write("Onde: $C_w$ = Conc. Sólidos (%), $\\rho_{s}$ = Densidade Sólido, $\\rho_{l}$ = Densidade Líquido.")
 
 if __name__ == "__main__":
     main()
