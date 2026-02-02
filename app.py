@@ -6,7 +6,7 @@ from fpdf import FPDF
 import io
 
 # 1. Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V54.1 Master", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V54.2 Final", layout="wide")
 
 # --- FUNÇÕES AUXILIARES ---
 def clean_txt(text):
@@ -42,8 +42,8 @@ def gerar_grafico(pressao_alvo, vazao_pico):
     img_buf.seek(0)
     return img_buf
 
-# --- FUNÇÃO PDF COMPLETA ---
-def gerar_pdf_final(d_cli, res_list, opex, bomba, img_graf, diagnostico):
+# --- FUNÇÃO PDF ---
+def gerar_pdf_final(d_cli, res_list, opex_detalhe, bomba, img_graf, diagnostico, taxa):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
@@ -52,22 +52,25 @@ def gerar_pdf_final(d_cli, res_list, opex, bomba, img_graf, diagnostico):
     
     # Dados Cliente
     pdf.set_font("Arial", "B", 10)
-    pdf.cell(95, 7, clean_txt(f"Cliente: {d_cli['cliente']}"), 1); pdf.cell(95, 7, clean_txt(f"OPP: {d_cli['opp']}"), 1, ln=True)
-    pdf.cell(95, 7, clean_txt(f"Produto: {d_cli['produto']}"), 1); pdf.cell(95, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
+    pdf.cell(95, 7, clean_txt(f"Cliente: {d_cli['cliente']}"), 1)
+    pdf.cell(95, 7, clean_txt(f"OPP: {d_cli['opp']}"), 1, ln=True)
+    pdf.cell(95, 7, clean_txt(f"Produto: {d_cli['produto']}"), 1)
+    pdf.cell(95, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
     pdf.ln(5)
 
-    # Diagnóstico de Taxa
+    # Diagnóstico
     pdf.set_fill_color(240, 240, 240)
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(190, 8, clean_txt(f"DIAGNOSTICO DE TAXA: {diagnostico}"), ln=True, fill=True)
+    pdf.cell(190, 8, clean_txt(f"TAXA CALCULADA: {taxa:.1f} kg/m2.h | STATUS: {diagnostico}"), ln=True, fill=True)
     pdf.ln(5)
 
-    # Imagem
-    with open("temp_v54.png", "wb") as f: f.write(img_graf.getbuffer())
-    pdf.image("temp_v54.png", x=25, y=None, w=160)
+    # Imagem Gráfico
+    img_path = "temp_v54_final.png"
+    with open(img_path, "wb") as f:
+        f.write(img_graf.getbuffer())
+    pdf.image(img_path, x=25, y=None, w=160)
     pdf.ln(5)
 
-    # Tabela
+    # Tabela de Modelos
     pdf.set_font("Arial", "B", 9)
     pdf.cell(45, 8, "Modelo", 1); pdf.cell(25, 8, "Placas", 1); pdf.cell(35, 8, "Area (m2)", 1); pdf.cell(85, 8, "Status", 1, ln=True)
     pdf.set_font("Arial", "", 9)
@@ -78,15 +81,16 @@ def gerar_pdf_final(d_cli, res_list, opex, bomba, img_graf, diagnostico):
         pdf.cell(85, 8, clean_txt(r["Status"].replace("✅", "OK").replace("❌", "Limite")), 1, ln=True)
     
     pdf.ln(10)
-    # Assinaturas
-    pdf.cell(80, 0.1, "", border="T"); pdf.cell(30, 0.1, ""); pdf.cell(80, 0.1, "", border="T", ln=True)
-    pdf.cell(80, 5, clean_txt(d_cli['resp']), 0, 0, 'C'); pdf.cell(30, 5, ""); pdf.cell(80, 5, "Aprovacao Cliente", 0, 1, 'C')
-    
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(190, 8, clean_txt(f"Resumo OPEX: R$ {opex_detalhe['total']:,.2f}/mes"), ln=True)
+    pdf.cell(190, 8, clean_txt(f"Bomba Recomendada: {bomba}"), ln=True)
+
     return pdf.output(dest="S").encode("latin-1", "ignore")
 
 # --- INTERFACE ---
-st.title("Cleanova Micronics | Dimensionador V54.1 Master")
+st.title("Cleanova Micronics | Dimensionador V54.2")
 
+# Cabeçalho
 c1, c2, c3 = st.columns(3)
 u_cliente = c1.text_input("**Cliente**")
 u_projeto = c2.text_input("**Projeto**")
@@ -97,6 +101,7 @@ u_produto = c4.selectbox("**Material de Referencia**", ["Ferro", "Rejeito", "Lit
 u_mercado = c5.text_input("**Mercado**")
 u_resp = c6.text_input("**Responsavel**")
 
+# Sidebar
 st.sidebar.header("🚀 Parametros")
 solidos_dia = st.sidebar.number_input("Sólidos (t/dia)", value=100.0)
 utilizacao_pct = st.sidebar.slider("Disponibilidade (%)", 0, 100, 90)
@@ -133,20 +138,22 @@ for p in tamanhos:
         res_list.append({"Modelo (mm)": f"{p['nom']}x{p['nom']}", "Placas": n_placas, "Area": n_placas * p["area_ref"], "Status": status})
         if "❌" in status: exibiu_erro = True
 
-# TAXA E OPEX
+# TAXA E OPEX DETALHADO
 area_sel = res_list[0]["Area"] if res_list else 1
 taxa_calc = massa_seco_ciclo / (area_sel * (tempo_cycle / 60))
 status_t, msg_t, cor_t = validar_taxa(taxa_calc, u_produto)
 
-energia_mes = (20 * disp_h * 30) * 0.65 # OPEX Energia
+energia_mes = (20 * disp_h * 30) * 0.65
 n_placas_ref = res_list[0]["Placas"] if res_list else 0
-lonas_mes = ((ciclos_dia * 30) / 2000) * (n_placas_ref * 2) * 450.0 # OPEX Lonas
+lonas_mes = ((ciclos_dia * 30) / 2000) * (n_placas_ref * 2) * 450.0
 total_opex = energia_mes + lonas_mes
-marca = "PEMO (Italia)" if pressao_manual <= 6 else "WEIR (Warman/GEHO)"
+marca_bomba = "PEMO (Italia)" if pressao_manual <= 6 else "WEIR (Warman/GEHO)"
 
-# EXIBIÇÃO
+# EXIBIÇÃO FINAL
+st.subheader("📋 Dimensionamento Sugerido")
 st.table(res_list)
-st.markdown(f"### Diagnostico: :{cor_t}[{status_t}] - {taxa_calc:.1f} kg/m2.h")
+
+st.markdown(f"### Diagnóstico Micronics: :{cor_t}[{status_t}] - {taxa_calc:.1f} kg/m².h")
 st.info(msg_t)
 
 col_g, col_o = st.columns([2, 1])
@@ -154,10 +161,19 @@ with col_g:
     buf = gerar_grafico(pressao_manual, vazao_pico)
     st.image(buf)
 with col_o:
-    st.metric("OPEX Mensal", f"R$ {total_opex:,.2f}")
-    st.success(f"Bomba: {marca}")
+    # Mostrando as 3 informações de OPEX como solicitado
+    st.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
+    st.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
+    st.success(f"💰 Total OPEX: R$ {total_opex:,.2f}")
+    st.markdown(f"**Bomba:** {marca_bomba}")
 
-if u_cliente and u_opp and u_resp:
-    d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto}
-    pdf_b = gerar_pdf_final(d_c, res_list, {"total": total_opex}, {"marca": marca}, buf, status_t)
-    st.download_button("📄 Baixar Relatorio V54.1", data=pdf_b, file_name=f"Estudo_{u_opp}.pdf")
+st.markdown("---")
+# Botão do PDF (sempre visível, mas valida os campos ao clicar)
+if st.button("📄 Gerar Relatório Técnico PDF"):
+    if u_cliente and u_opp and u_resp:
+        d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto}
+        opex_d = {"total": total_opex, "energia": energia_mes, "lonas": lonas_mes}
+        pdf_b = gerar_pdf_final(d_c, res_list, opex_d, marca_bomba, buf, status_t, taxa_calc)
+        st.download_button("⬇️ Baixar Estudo Técnico", data=pdf_b, file_name=f"Estudo_Micronics_{u_opp}.pdf", mime="application/pdf")
+    else:
+        st.error("Por favor, preencha os campos 'Cliente', 'Numero da OPP' e 'Responsavel' no cabeçalho.")
