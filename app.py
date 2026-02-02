@@ -36,8 +36,6 @@ def main():
     st.sidebar.header("📥 Parâmetros de Processo")
     prod_seca_dia = st.sidebar.number_input("Massa Seca (t/Dia)", value=240.0)
     prod_seca_hora = st.sidebar.number_input("Massa Seca (t/h)", value=10.0)
-    
-    # Adicionado Volume de lodo/dia conforme solicitado
     vol_lodo_dia_input = st.sidebar.number_input("Volume de lodo/dia (m³)", value=500.0)
     
     disponibilidade_h = st.sidebar.slider("Disponibilidade de Equipamento (h/dia)", 1, 24, 20)
@@ -53,8 +51,8 @@ def main():
     vida_util_lona = st.sidebar.number_input("Vida Útil da Lona (Ciclos)", value=2000)
     tempo_ciclo_min = st.sidebar.number_input("Tempo de Ciclo (min)", value=60)
     
-    # Adicionado campo para Quilovates no ciclo de operação
-    kwh_ciclo = st.sidebar.number_input("Consumo Elétrico por Ciclo (kWh)", value=45.0)
+    # Parâmetro atualizado conforme sua preferência
+    custo_kwh_hora = st.sidebar.number_input("Custo do KWH por hora (R$/h)", value=15.50)
     
     pressao_operacao = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
 
@@ -67,7 +65,9 @@ def main():
     
     ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min
     trocas_lona_ano = (ciclos_dia * 365) / vida_util_lona
-    consumo_diario_kwh = ciclos_dia * kwh_ciclo
+    
+    # Cálculo financeiro de energia baseado no custo por hora
+    custo_energia_diario = disponibilidade_h * custo_kwh_hora
 
     # --- CAIXAS DE RESUMO (CARDS) ---
     st.write(f"### 🚀 Resumo Operacional: {nome_projeto}")
@@ -109,8 +109,7 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📈 OPEX & Performance"])
 
     with tab1:
-        st.write(f"**Empresa:** {empresa} | **Massa Seca Diária:** {prod_seca_dia} t/Dia")
-        st.write(f"**Volume de lodo informado:** {vol_lodo_dia_input} m³/dia")
+        st.write(f"**Empresa:** {empresa} | **Local:** {cidade}/{estado}")
         st.table(pd.DataFrame(selecao_final))
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"Hardware Sugerido: Bomba **{tipo_bomba}**.")
@@ -121,7 +120,7 @@ def main():
             st.subheader("Manutenção e Ciclos")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Trocas de Lona/Ano:** {trocas_lona_ano:.2f}")
-            st.write(f"**Consumo Estimado:** {consumo_diario_kwh:.2f} kWh/dia")
+            st.write(f"**Custo Energia Diário:** R$ {custo_energia_diario:.2f}")
         with col_opex2:
             st.subheader("Composição de Custos")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
