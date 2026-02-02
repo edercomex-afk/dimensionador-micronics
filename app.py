@@ -6,7 +6,7 @@ from fpdf import FPDF
 import io
 
 # 1. Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V54.2 Final", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V54.3 Final", layout="wide")
 
 # --- FUNÇÕES AUXILIARES ---
 def clean_txt(text):
@@ -88,7 +88,7 @@ def gerar_pdf_final(d_cli, res_list, opex_detalhe, bomba, img_graf, diagnostico,
     return pdf.output(dest="S").encode("latin-1", "ignore")
 
 # --- INTERFACE ---
-st.title("Cleanova Micronics | Dimensionador V54.2")
+st.title("Cleanova Micronics | Dimensionador V54.3")
 
 # Cabeçalho
 c1, c2, c3 = st.columns(3)
@@ -101,8 +101,8 @@ u_produto = c4.selectbox("**Material de Referencia**", ["Ferro", "Rejeito", "Lit
 u_mercado = c5.text_input("**Mercado**")
 u_resp = c6.text_input("**Responsavel**")
 
-# Sidebar
-st.sidebar.header("🚀 Parametros")
+# Sidebar - Parâmetros Técnicos
+st.sidebar.header("🚀 Parâmetros de Processo")
 solidos_dia = st.sidebar.number_input("Sólidos (t/dia)", value=100.0)
 utilizacao_pct = st.sidebar.slider("Disponibilidade (%)", 0, 100, 90)
 tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=45)
@@ -112,10 +112,17 @@ umidade_input = st.sidebar.number_input("Umidade (%)", value=20.0)
 recesso = st.sidebar.number_input("Recesso (mm)", value=30.0)
 pressao_manual = st.sidebar.slider("Pressão (Bar)", 1, 15, 7)
 
-# CÁLCULOS
+# Sidebar - Parâmetros Financeiros (OPEX) - RESTAURADO
+st.sidebar.header("💰 Parâmetros OPEX")
+custo_kwh = st.sidebar.number_input("Custo Energia (R$/kWh)", value=0.65)
+custo_lona_un = st.sidebar.number_input("Preço Lona (R$/unid)", value=450.0)
+vida_lona_ciclos = st.sidebar.number_input("Vida útil lona (Ciclos)", value=2000)
+
+# CÁLCULOS TÉCNICOS
 umidade = umidade_input / 100
 disp_h = 24 * (utilizacao_pct / 100)
 ciclos_dia = (disp_h * 60) / tempo_cycle if tempo_cycle > 0 else 0
+ciclos_mes = ciclos_dia * 30
 massa_seco_ciclo = (solidos_dia * 1000) / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
 vol_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta)
@@ -143,9 +150,10 @@ area_sel = res_list[0]["Area"] if res_list else 1
 taxa_calc = massa_seco_ciclo / (area_sel * (tempo_cycle / 60))
 status_t, msg_t, cor_t = validar_taxa(taxa_calc, u_produto)
 
-energia_mes = (20 * disp_h * 30) * 0.65
+# Cálculos OPEX com inputs da Sidebar
+energia_mes = (20 * disp_h * 30) * custo_kwh  # Assume-se 20kW como base de motor médio
 n_placas_ref = res_list[0]["Placas"] if res_list else 0
-lonas_mes = ((ciclos_dia * 30) / 2000) * (n_placas_ref * 2) * 450.0
+lonas_mes = (ciclos_mes / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un
 total_opex = energia_mes + lonas_mes
 marca_bomba = "PEMO (Italia)" if pressao_manual <= 6 else "WEIR (Warman/GEHO)"
 
@@ -161,19 +169,17 @@ with col_g:
     buf = gerar_grafico(pressao_manual, vazao_pico)
     st.image(buf)
 with col_o:
-    # Mostrando as 3 informações de OPEX como solicitado
     st.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
     st.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
     st.success(f"💰 Total OPEX: R$ {total_opex:,.2f}")
     st.markdown(f"**Bomba:** {marca_bomba}")
 
 st.markdown("---")
-# Botão do PDF (sempre visível, mas valida os campos ao clicar)
 if st.button("📄 Gerar Relatório Técnico PDF"):
     if u_cliente and u_opp and u_resp:
         d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto}
-        opex_d = {"total": total_opex, "energia": energia_mes, "lonas": lonas_mes}
+        opex_d = {"total": total_opex}
         pdf_b = gerar_pdf_final(d_c, res_list, opex_d, marca_bomba, buf, status_t, taxa_calc)
         st.download_button("⬇️ Baixar Estudo Técnico", data=pdf_b, file_name=f"Estudo_Micronics_{u_opp}.pdf", mime="application/pdf")
     else:
-        st.error("Por favor, preencha os campos 'Cliente', 'Numero da OPP' e 'Responsavel' no cabeçalho.")
+        st.error("Por favor, preencha 'Cliente', 'Numero da OPP' e 'Responsavel' para gerar o PDF.")
