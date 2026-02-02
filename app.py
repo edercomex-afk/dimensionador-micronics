@@ -30,11 +30,14 @@ def main():
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("Cidade", value="São Paulo")
-    estado = col_est.selectbox("Estado", estados_br, index=24) # SP como padrão
+    estado = st.sidebar.selectbox("Estado", estados_br, index=24) # SP Padrão
 
     st.sidebar.divider()
     st.sidebar.header("📥 Parâmetros de Processo")
-    prod_seca = st.sidebar.number_input("Massa Seca (t/h)", value=10.0)
+    
+    # Adicionado o box para Massa Seca (t/Dia) conforme solicitado
+    prod_seca_dia = st.sidebar.number_input("Massa Seca (t/Dia)", value=240.0)
+    prod_seca_hora = st.sidebar.number_input("Massa Seca (t/h)", value=10.0)
     
     # Disponibilidade em barras ajustáveis (Slider)
     disponibilidade_h = st.sidebar.slider("Disponibilidade de Equipamento (h/dia)", 1, 24, 20)
@@ -45,7 +48,7 @@ def main():
     st.sidebar.header("🧬 Densidade e Geometria")
     sg_solido = st.sidebar.number_input("SG Sólido (g/cm³)", value=2.70, format="%.2f")
     
-    # Espessura da Câmara liberada para inserir valores (number_input)
+    # Espessura da Câmara liberada para inserir valores
     espessura_camara = st.sidebar.number_input("Espessura da Câmara (mm)", value=40, step=1)
     
     st.sidebar.divider()
@@ -59,7 +62,7 @@ def main():
     sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos))
     
     # Taxa de fluxo de lodo m³/h e Volume Dia
-    massa_polpa_hora = prod_seca / (conc_solidos / 100)
+    massa_polpa_hora = prod_seca_hora / (conc_solidos / 100)
     taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo
     vol_lodo_dia = taxa_fluxo_lodo_m3h * disponibilidade_h
     vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
@@ -83,8 +86,7 @@ def main():
     st.divider()
 
     # --- TABELA DE SELEÇÃO DE FILTROS ---
-    # Volume de torta por ciclo (SG Torta fixo 1.8)
-    vol_torta_ciclo_m3 = (prod_seca * (tempo_ciclo_min/60)) / 1.8 
+    vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 
     
     mapa_filtros = [
         {"Modelo": "800mm", "Vol_Placa": 15, "Area_Placa": 1.1},
@@ -98,7 +100,7 @@ def main():
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"])
         area_total = num_placas * f["Area_Placa"]
-        taxa_filt = (prod_seca * 1000) / area_total
+        taxa_filt = (prod_seca_hora * 1000) / area_total
         selecao_final.append({
             "Equipamento": f["Modelo"],
             "Qtd Placas": int(num_placas),
@@ -110,8 +112,8 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📈 OPEX & Performance"])
 
     with tab1:
-        st.write(f"**Empresa:** {empresa} | **Localidade:** {cidade}/{estado}")
-        st.write(f"**Espessura de Câmara Definida:** {espessura_camara} mm")
+        st.write(f"**Empresa:** {empresa} | **Local:** {cidade}/{estado}")
+        st.write(f"**Massa Seca Diária:** {prod_seca_dia} t/Dia")
         st.table(pd.DataFrame(selecao_final))
         
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
@@ -120,7 +122,7 @@ def main():
     with tab2:
         col_opex1, col_opex2 = st.columns(2)
         with col_opex1:
-            st.subheader("Manutenção de Lonas")
+            st.subheader("Manutenção e Ciclos")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Trocas de Lona/Ano:** {trocas_lona_ano:.2f}")
             
