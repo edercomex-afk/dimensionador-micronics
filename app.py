@@ -1,191 +1,121 @@
 import streamlit as st
 import math
-import matplotlib.pyplot as plt
-import numpy as np
-from fpdf import FPDF
-import io
 
-# 1. Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V55.0 Master", layout="wide")
+# Configuração da página
+st.set_page_config(page_title="Dimensionador Cleanova Micronics V55", layout="wide")
 
-# --- FUNÇÕES AUXILIARES ---
-def clean_txt(text):
-    return str(text).encode('latin-1', 'ignore').decode('latin-1')
+def main():
+    st.title("🏗️ Dimensionador Industrial - Cleanova Micronics")
+    st.markdown(f"**Engenheiro Responsável:** Eder")
+    st.divider()
 
-def validar_taxa(taxa_calc, material_selecionado):
-    referencias = {
-        "Cobre": 300, "Efluente industrial": 50, "Ferro": 450, "Grafite": 150, 
-        "Lama Vermelha": 60, "Litio": 120, "Niquel": 250, "Ouro": 200, 
-        "Rejeito de Cobre": 180, "Rejeito de Ferro": 220, "Rejeito de Grafite": 110,
-        "Rejeito de ouro": 150, "Rejeito de terras raras": 90, "Terras Raras": 100
-    }
-    limite = referencias.get(material_selecionado, 100)
-    if taxa_calc <= limite:
-        return "✅ Segura", "Dimensionamento robusto.", "green"
-    elif taxa_calc <= limite * 1.3:
-        return "🟡 Atencao", "Taxa agressiva. Exige polimeros.", "orange"
-    else:
-        return "🔴 Critica", "Risco de torta umida. Aumente o filtro.", "red"
-
-def gerar_grafico(pressao_alvo, vazao_pico):
-    tempo = np.linspace(0, 45, 100)
-    pressao = pressao_alvo * (1 - np.exp(-0.15 * tempo))
-    vazao = vazao_pico * np.exp(-0.12 * tempo)
-    fig, ax1 = plt.subplots(figsize=(8, 4))
-    ax1.set_xlabel('Tempo (min)')
-    ax1.set_ylabel('Pressao (Bar)', color='tab:red')
-    ax1.plot(tempo, pressao, color='tab:red', linewidth=3)
-    ax1.grid(True, linestyle='--', alpha=0.5)
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Vazao (L/h)', color='tab:blue')
-    ax2.plot(tempo, vazao, color='tab:blue', linewidth=3)
-    plt.title("Curva de Performance: Filtro e Bomba")
-    fig.tight_layout()
-    img_buf = io.BytesIO()
-    plt.savefig(img_buf, format='png', dpi=120)
-    plt.close(fig)
-    img_buf.seek(0)
-    return img_buf
-
-# --- FUNÇÃO PDF ---
-def gerar_pdf_final(d_cli, res_list, opex_detalhe, bomba, img_graf, diagnostico, taxa):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(190, 10, clean_txt("ESTUDO TECNICO DE FILTRACAO - V55.0"), ln=True, align="C")
-    pdf.ln(5)
+    # --- ENTRADA DE DADOS (SIDEBAR) ---
+    st.sidebar.header("📥 Parâmetros de Entrada")
     
-    pdf.set_font("Arial", "B", 9)
-    # Ordem Cidade / Estado / Contato
-    pdf.cell(95, 7, clean_txt(f"Cliente: {d_cli['cliente']}"), 1)
-    pdf.cell(95, 7, clean_txt(f"OPP: {d_cli['opp']}"), 1, ln=True)
-    pdf.cell(63, 7, clean_txt(f"Cidade: {d_cli['cidade']}"), 1)
-    pdf.cell(63, 7, clean_txt(f"Estado: {d_cli['estado']}"), 1)
-    pdf.cell(64, 7, clean_txt(f"Contato: {d_cli['contato']}"), 1, ln=True)
-    pdf.cell(63, 7, clean_txt(f"Material: {d_cli['produto']}"), 1)
-    pdf.cell(63, 7, clean_txt(f"Mercado: {d_cli['mercado']}"), 1)
-    pdf.cell(64, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
-    pdf.ln(5)
-
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(190, 8, clean_txt(f"TAXA CALCULADA: {taxa:.1f} kg/m2.h | STATUS: {diagnostico}"), ln=True, fill=True)
-    pdf.ln(5)
-
-    with open("temp_v550.png", "wb") as f: f.write(img_graf.getbuffer())
-    pdf.image("temp_v550.png", x=25, y=None, w=160)
-    pdf.ln(5)
-
-    pdf.set_font("Arial", "B", 9)
-    pdf.cell(45, 8, "Modelo", 1); pdf.cell(25, 8, "Placas", 1); pdf.cell(35, 8, "Area (m2)", 1); pdf.cell(85, 8, "Status", 1, ln=True)
-    pdf.set_font("Arial", "", 9)
-    for r in res_list:
-        pdf.cell(45, 8, clean_txt(r["Modelo (mm)"]), 1)
-        pdf.cell(25, 8, str(r["Placas"]), 1)
-        pdf.cell(35, 8, f"{r['Area']:.1f}", 1)
-        pdf.cell(85, 8, clean_txt(r["Status"].replace("✅", "OK").replace("❌", "Limite")), 1, ln=True)
+    # Produção e Processo
+    prod_seca_ton = st.sidebar.number_input("Produção de Sólidos Secos (ton/h)", value=10.0, step=0.5)
+    conc_solidos_w = st.sidebar.number_input("Concentração de Sólidos na Polpa (% w/w)", value=30.0, step=1.0)
+    horas_op = st.sidebar.number_input("Horas de Operação por Dia (h)", value=20, step=1)
     
-    pdf.ln(10)
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(190, 8, clean_txt(f"OPEX Total Estimado: R$ {opex_detalhe['total']:,.2f}/mes"), ln=True)
-    pdf.cell(190, 8, clean_txt(f"Bomba Recomendada: {bomba}"), ln=True)
-    return pdf.output(dest="S").encode("latin-1", "ignore")
+    # Densidades
+    rho_solido = st.sidebar.number_input("Densidade do Sólido (t/m³)", value=2.7, step=0.1)
+    rho_liquido = st.sidebar.number_input("Densidade do Líquido (t/m³)", value=1.0, step=0.01)
+    
+    # Parâmetros de Filtração
+    pressao_target = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
+    area_filtracao = st.sidebar.number_input("Área de Filtração do Filtro (m²)", value=150.0, step=10.0)
 
-# --- INTERFACE ---
-st.title("Cleanova Micronics | Dimensionador V55.0")
+    # --- NÚCLEO DE CÁLCULO (MEMÓRIA TÉCNICA) ---
+    
+    # 1. Densidade da Polpa (Mistura)
+    # Formula: 100 / ((%S / RhoS) + (%L / RhoL))
+    rho_polpa = 100 / ((conc_solidos_w / rho_solido) + ((100 - conc_solidos_w) / rho_liquido))
+    
+    # 2. Volume de Lodo por Hora (m³/h)
+    # Volume = Massa / (Densidade * Concentração)
+    vol_lodo_hora = prod_seca_ton / (rho_polpa * (conc_solidos_w / 100))
+    
+    # 3. Volume de Lodo por Dia (m³/dia) - Requisito Eder
+    vol_lodo_dia = vol_lodo_hora * horas_op
+    
+    # 4. Vazão de Pico (L/h) - Abaixo da unidade conforme solicitado
+    # Considerando fator de pico para enchimento rápido (30% de margem)
+    vazao_pico_lh = (vol_lodo_hora * 1000) * 1.3
 
-# Cabeçalho - Linha 1
-c1, c2, c3 = st.columns(3)
-u_cliente = c1.text_input("**Cliente**")
-u_projeto = c2.text_input("**Projeto**")
-u_opp = c3.text_input("**Numero da OPP**")
+    # 5. Taxa de Filtração Específica (kg/m².h)
+    taxa_especifica = (prod_seca_ton * 1000) / area_filtracao
 
-# Cabeçalho - Linha 2
-c4, c5, c6 = st.columns(3)
-u_produto = c4.selectbox("**Material de Referencia**", sorted([
-    "Cobre", "Efluente industrial", "Ferro", "Grafite", "Lama Vermelha", 
-    "Litio", "Niquel", "Ouro", "Rejeito de Cobre", "Rejeito de Ferro", 
-    "Rejeito de Grafite", "Rejeito de ouro", "Rejeito de terras raras", "Terras Raras"
-]))
-u_mercado = c5.selectbox("**Mercado**", sorted(["Alimentos", "Bebidas", "Farmáceutico", "Mineração", "Química"]))
-u_resp = c6.text_input("**Responsavel**")
+    # --- EXPOSIÇÃO DOS RESULTADOS ---
+    
+    col_res1, col_res2 = st.columns(2)
 
-# Cabeçalho - Linha 3 (Cidade antes de Estado)
-c7, c8, c9 = st.columns(3)
-u_cidade = c7.text_input("**Cidade**")
-u_estado = c8.selectbox("**Estado**", sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]))
-u_contato = c9.text_input("**Contato**")
+    with col_res1:
+        st.subheader("💧 Balanço Hidráulico")
+        container_h = st.container(border=True)
+        container_h.metric("Volume de Lodo por Dia", f"{vol_lodo_dia:.2f} m³/dia")
+        container_h.metric("Vazão de Pico", f"{vazao_pico_lh:,.2f} L/h")
+        container_h.write(f"**Densidade da Polpa:** {rho_polpa:.3f} t/m³")
 
-# Sidebar
-st.sidebar.header("🚀 Processo")
-solidos_dia = st.sidebar.number_input("Sólidos (t/dia)", value=100.0)
-utilizacao_pct = st.sidebar.slider("Disponibilidade (%)", 0, 100, 90)
-tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=45)
-vazao_pico = st.sidebar.number_input("Vazão Pico (L/h)", value=50000.0)
-sg_solidos = st.sidebar.number_input("SG Sólidos", value=2.8)
-umidade_input = st.sidebar.number_input("Umidade (%)", value=20.0)
-recesso = st.sidebar.number_input("Recesso (mm)", value=30.0)
-pressao_manual = st.sidebar.slider("Pressão (Bar)", 1, 15, 7)
+    with col_res2:
+        st.subheader("⚙️ Performance do Equipamento")
+        container_p = st.container(border=True)
+        container_p.metric("Taxa de Filtração", f"{taxa_especifica:.2f} kg/m².h")
+        
+        # Lógica do Farol (Sinalizador)
+        limite_referencia = 300 # Exemplo para Concentrado (pode ser dinâmico)
+        porcentagem_limite = (taxa_especifica / limite_referencia) * 100
 
-st.sidebar.header("💰 OPEX Config")
-custo_kwh = st.sidebar.number_input("Custo Energia (R$/kWh)", value=0.65)
-custo_lona_un = st.sidebar.number_input("Preço Lona (R$/unid)", value=450.0)
-vida_lona_ciclos = st.sidebar.number_input("Vida útil lona (Ciclos)", value=2000)
+        if porcentagem_limite <= 100:
+            st.success("Sinalizador: VERDE (Operação Segura)")
+        elif porcentagem_limite <= 130:
+            st.warning("Sinalizador: AMARELO (Operação Agressiva)")
+        else:
+            st.error("Sinalizador: VERMELHO (Risco de Sobrecarga)")
 
-# CÁLCULOS
-umidade = umidade_input / 100
-disp_h = 24 * (utilizacao_pct / 100)
-ciclos_dia = (disp_h * 60) / tempo_cycle if tempo_cycle > 0 else 0
-massa_seco_ciclo = (solidos_dia * 1000) / ciclos_dia if ciclos_dia > 0 else 0
-dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
-vol_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta)
+    st.divider()
 
-tamanhos = [
-    {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
-    {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
-    {"nom": 1500, "area_ref": 4.50, "vol_ref": 70,  "max": 120},
-    {"nom": 1200, "area_ref": 2.75, "vol_ref": 37,  "max": 100},
-]
+    # --- ESPECIFICAÇÃO DE BOMBAS ---
+    st.subheader("Pump Selector: Definição de Hardware")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        if pressao_target <= 6:
+            st.info("### Bomba Selecionada: **PEMO**")
+            st.write("""
+            - **Tipo:** Centrífuga com revestimento em borracha.
+            - **Justificativa:** Pressão dentro do limite de vulcanização. 
+            - **Vantagem:** Alta resistência à abrasão e vazão de pico estável.
+            """)
+        else:
+            st.info("### Bomba Selecionada: **WARMAN / WEIR**")
+            st.write("""
+            - **Tipo:** Bomba de Polpa Heavy Duty.
+            - **Justificativa:** Pressão acima de 6 Bar exige carcaça metálica/reforçada.
+            - **Vantagem:** Vence a perda de carga final do ciclo da torta.
+            """)
+            
+    with c2:
+        st.write("**Resumo Técnico para GitHub:**")
+        st.code(f"""
+        # Dados de Dimensionamento
+        VOL_DIA = {vol_lodo_dia:.2f} m3
+        VAZAO_PICO = {vazao_pico_lh:.2f} L/h
+        PRESSAO = {pressao_target} Bar
+        BOMBA = {"PEMO" if pressao_target <= 6 else "WARMAN"}
+        """, language='python')
 
-res_list = []
-exibiu_erro = False
-for p in tamanhos:
-    v_adj = p["vol_ref"] * (recesso / 30)
-    n_placas = math.ceil(vol_req / v_adj) if v_adj > 0 else 0
-    if p["nom"] > 1000 and n_placas < 25: continue
-    status = "✅ OK" if n_placas <= p["max"] else "❌ Limite"
-    if status == "✅ OK" or not exibiu_erro:
-        res_list.append({"Modelo (mm)": f"{p['nom']}x{p['nom']}", "Placas": n_placas, "Area": n_placas * p["area_ref"], "Status": status})
-        if "❌" in status: exibiu_erro = True
+    # --- MEMORIAL DE CÁLCULO (EXPANDER) ---
+    with st.expander("📖 Ver Detalhamento de Fórmulas e Relacionamentos"):
+        st.markdown("### Fórmulas Aplicadas no Dimensionamento:")
+        st.latex(r"V_{dia} = \left( \frac{M_{seca}}{\rho_{polpa} \cdot C_w} \right) \cdot H_{op}")
+        st.latex(r"Q_{pico} (L/h) = (V_{hora} \cdot 1000) \cdot 1.3")
+        st.latex(r"T_{esp} = \frac{M_{seca} \cdot 1000}{A}")
+        st.markdown("""
+        ---
+        **Riscos de Dados Incorretos:**
+        1. **Densidade Errada:** Impacta diretamente no volume total diário, podendo causar subdimensionamento da frota de filtros.
+        2. **% Sólidos Baixo:** Aumenta a vazão de pico, podendo causar cavitação na bomba selecionada.
+        """)
 
-# TAXA E OPEX
-area_sel = res_list[0]["Area"] if res_list else 1
-taxa_calc = massa_seco_ciclo / (area_sel * (tempo_cycle / 60))
-status_t, msg_t, cor_t = validar_taxa(taxa_calc, u_produto)
-
-# EXIBIÇÃO
-st.table(res_list)
-st.markdown(f"### Diagnostico para {u_produto}: :{cor_t}[{status_t}] - {taxa_calc:.1f} kg/m2.h")
-st.info(msg_t)
-
-col_g, col_o = st.columns([2, 1])
-with col_g:
-    buf = gerar_grafico(pressao_manual, vazao_pico)
-    st.image(buf)
-with col_o:
-    energia_mes = (20 * disp_h * 30) * custo_kwh
-    n_placas_ref = res_list[0]["Placas"] if res_list else 0
-    lonas_mes = (((ciclos_dia * 30) / vida_lona_ciclos) * (n_placas_ref * 2) * custo_lona_un) if vida_lona_ciclos > 0 else 0
-    st.info(f"⚡ Energia: R$ {energia_mes:,.2f}")
-    st.info(f"🧵 Lonas: R$ {lonas_mes:,.2f}")
-    st.success(f"💰 Total OPEX: R$ {(energia_mes + lonas_mes):,.2f}")
-    marca_bomba = "PEMO (Italia)" if pressao_manual <= 6 else "WEIR (Warman/GEHO)"
-    st.markdown(f"**Bomba:** {marca_bomba}")
-
-st.markdown("---")
-if st.button("📄 Gerar Relatorio Tecnico PDF"):
-    if u_cliente and u_opp and u_resp:
-        d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto, "mercado": u_mercado, "estado": u_estado, "cidade": u_cidade, "contato": u_contato}
-        pdf_b = gerar_pdf_final(d_c, res_list, {"total": energia_mes + lonas_mes}, marca_bomba, buf, status_t, taxa_calc)
-        st.download_button("⬇️ Baixar Estudo", data=pdf_b, file_name=f"Estudo_Micronics_{u_opp}.pdf")
-    else:
-        st.error("Preencha os campos obrigatórios no cabeçalho.")
+if __name__ == "__main__":
+    main()
