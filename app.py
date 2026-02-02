@@ -6,31 +6,22 @@ from fpdf import FPDF
 import io
 
 # 1. Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V54 Inteligente", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V54.1 Master", layout="wide")
 
+# --- FUNÇÕES AUXILIARES ---
 def clean_txt(text):
     return str(text).encode('latin-1', 'ignore').decode('latin-1')
 
-# --- FUNÇÃO DO SEMÁFORO DE TAXA ---
 def validar_taxa(taxa_calc, material_selecionado):
-    # Referências de mercado (kg/m2.h)
-    referencias = {
-        "Ferro": 450,
-        "Rejeito": 220,
-        "Litio": 120,
-        "Quimico": 50,
-        "Biologico": 10
-    }
+    referencias = {"Ferro": 450, "Rejeito": 220, "Litio": 120, "Quimico": 50, "Biologico": 10}
     limite = referencias.get(material_selecionado, 100)
-    
     if taxa_calc <= limite:
-        return "✅ Segura", "Seu dimensionamento está conservador e robusto.", "green"
+        return "✅ Segura", "Dimensionamento robusto.", "green"
     elif taxa_calc <= limite * 1.3:
-        return "🟡 Atenção", "Taxa agressiva. Exigirá condicionamento químico perfeito.", "orange"
+        return "🟡 Atencao", "Taxa agressiva. Exige polimeros.", "orange"
     else:
-        return "🔴 Crítica", "Risco alto de torta úmida. Sugerimos aumentar o filtro.", "red"
+        return "🔴 Critica", "Risco de torta umida. Aumente o filtro.", "red"
 
-# --- FUNÇÃO GRÁFICO ---
 def gerar_grafico(pressao_alvo, vazao_pico):
     tempo = np.linspace(0, 45, 100)
     pressao = pressao_alvo * (1 - np.exp(-0.15 * tempo))
@@ -39,40 +30,78 @@ def gerar_grafico(pressao_alvo, vazao_pico):
     ax1.set_xlabel('Tempo (min)')
     ax1.set_ylabel('Pressao (Bar)', color='tab:red')
     ax1.plot(tempo, pressao, color='tab:red', linewidth=3)
+    ax1.grid(True, linestyle='--', alpha=0.5)
     ax2 = ax1.twinx()
     ax2.set_ylabel('Vazao (L/h)', color='tab:blue')
     ax2.plot(tempo, vazao, color='tab:blue', linewidth=3)
     plt.title("Curva de Performance: Filtro e Bomba")
     fig.tight_layout()
     img_buf = io.BytesIO()
-    plt.savefig(img_buf, format='png', dpi=100)
+    plt.savefig(img_buf, format='png', dpi=120)
     plt.close(fig)
     img_buf.seek(0)
     return img_buf
 
-# --- INTERFACE ---
-st.title("Cleanova Micronics | Dimensionador V54 (Consultivo)")
+# --- FUNÇÃO PDF COMPLETA ---
+def gerar_pdf_final(d_cli, res_list, opex, bomba, img_graf, diagnostico):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(190, 10, clean_txt("ESTUDO TECNICO DE FILTRACAO - V54"), ln=True, align="C")
+    pdf.ln(5)
+    
+    # Dados Cliente
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(95, 7, clean_txt(f"Cliente: {d_cli['cliente']}"), 1); pdf.cell(95, 7, clean_txt(f"OPP: {d_cli['opp']}"), 1, ln=True)
+    pdf.cell(95, 7, clean_txt(f"Produto: {d_cli['produto']}"), 1); pdf.cell(95, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
+    pdf.ln(5)
 
-# Cabeçalho em Negrito
+    # Diagnóstico de Taxa
+    pdf.set_fill_color(240, 240, 240)
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(190, 8, clean_txt(f"DIAGNOSTICO DE TAXA: {diagnostico}"), ln=True, fill=True)
+    pdf.ln(5)
+
+    # Imagem
+    with open("temp_v54.png", "wb") as f: f.write(img_graf.getbuffer())
+    pdf.image("temp_v54.png", x=25, y=None, w=160)
+    pdf.ln(5)
+
+    # Tabela
+    pdf.set_font("Arial", "B", 9)
+    pdf.cell(45, 8, "Modelo", 1); pdf.cell(25, 8, "Placas", 1); pdf.cell(35, 8, "Area (m2)", 1); pdf.cell(85, 8, "Status", 1, ln=True)
+    pdf.set_font("Arial", "", 9)
+    for r in res_list:
+        pdf.cell(45, 8, clean_txt(r["Modelo (mm)"]), 1)
+        pdf.cell(25, 8, str(r["Placas"]), 1)
+        pdf.cell(35, 8, f"{r['Area']:.1f}", 1)
+        pdf.cell(85, 8, clean_txt(r["Status"].replace("✅", "OK").replace("❌", "Limite")), 1, ln=True)
+    
+    pdf.ln(10)
+    # Assinaturas
+    pdf.cell(80, 0.1, "", border="T"); pdf.cell(30, 0.1, ""); pdf.cell(80, 0.1, "", border="T", ln=True)
+    pdf.cell(80, 5, clean_txt(d_cli['resp']), 0, 0, 'C'); pdf.cell(30, 5, ""); pdf.cell(80, 5, "Aprovacao Cliente", 0, 1, 'C')
+    
+    return pdf.output(dest="S").encode("latin-1", "ignore")
+
+# --- INTERFACE ---
+st.title("Cleanova Micronics | Dimensionador V54.1 Master")
+
 c1, c2, c3 = st.columns(3)
-cliente = c1.text_input("**Cliente**")
-projeto = c2.text_input("**Projeto**")
-n_opp = c3.text_input("**Numero da OPP**")
+u_cliente = c1.text_input("**Cliente**")
+u_projeto = c2.text_input("**Projeto**")
+u_opp = c3.text_input("**Numero da OPP**")
 
 c4, c5, c6 = st.columns(3)
-produto = c4.selectbox("**Material de Referência**", ["Ferro", "Rejeito", "Litio", "Quimico", "Biologico"])
-mercado = c5.text_input("**Mercado**")
-responsavel = c6.text_input("**Responsavel**")
+u_produto = c4.selectbox("**Material de Referencia**", ["Ferro", "Rejeito", "Litio", "Quimico", "Biologico"])
+u_mercado = c5.text_input("**Mercado**")
+u_resp = c6.text_input("**Responsavel**")
 
-# Sidebar
-st.sidebar.header("🚀 Capacidade")
+st.sidebar.header("🚀 Parametros")
 solidos_dia = st.sidebar.number_input("Sólidos (t/dia)", value=100.0)
 utilizacao_pct = st.sidebar.slider("Disponibilidade (%)", 0, 100, 90)
 tempo_cycle = st.sidebar.number_input("Ciclo (min)", value=45)
-
-st.sidebar.header("🧪 Processo")
-vol_lodo_dia = st.sidebar.number_input("Volume Lodo (m³/dia)", value=500.0)
-vazao_pico = st.sidebar.number_input("Vazão Pico Bomba (L/h)", value=50000.0)
+vazao_pico = st.sidebar.number_input("Vazão Pico (L/h)", value=50000.0)
 sg_solidos = st.sidebar.number_input("SG Sólidos", value=2.8)
 umidade_input = st.sidebar.number_input("Umidade (%)", value=20.0)
 recesso = st.sidebar.number_input("Recesso (mm)", value=30.0)
@@ -86,7 +115,6 @@ massa_seco_ciclo = (solidos_dia * 1000) / ciclos_dia if ciclos_dia > 0 else 0
 dens_torta = 1 / (((1 - umidade) / sg_solidos) + (umidade / 1.0)) if sg_solidos > 0 else 1
 vol_req = ((massa_seco_ciclo / (1 - umidade)) / dens_torta)
 
-# Modelos
 tamanhos = [
     {"nom": 2500, "area_ref": 6.25, "vol_ref": 165, "max": 190},
     {"nom": 2000, "area_ref": 4.50, "vol_ref": 125, "max": 160},
@@ -100,37 +128,36 @@ for p in tamanhos:
     v_adj = p["vol_ref"] * (recesso / 30)
     n_placas = math.ceil(vol_req / v_adj) if v_adj > 0 else 0
     if p["nom"] > 1000 and n_placas < 25: continue
-    
-    if n_placas <= p["max"]:
-        res_list.append({"Modelo (mm)": f"{p['nom']}x{p['nom']}", "Placas": n_placas, "Area": n_placas * p["area_ref"], "Status": "✅ OK"})
-    elif not exibiu_erro:
-        res_list.append({"Modelo (mm)": f"{p['nom']}x{p['nom']}", "Placas": n_placas, "Area": n_placas * p["area_ref"], "Status": "❌ Limite"})
-        exibiu_erro = True
+    status = "✅ OK" if n_placas <= p["max"] else "❌ Limite"
+    if status == "✅ OK" or not exibiu_erro:
+        res_list.append({"Modelo (mm)": f"{p['nom']}x{p['nom']}", "Placas": n_placas, "Area": n_placas * p["area_ref"], "Status": status})
+        if "❌" in status: exibiu_erro = True
 
-# KPI DE TAXA (O Coração da V54)
-area_selecionada = res_list[0]["Area"] if res_list else 1
-taxa_calc = massa_seco_ciclo / (area_selecionada * (tempo_cycle / 60))
-status_t, msg_t, cor_t = validar_taxa(taxa_calc, produto)
+# TAXA E OPEX
+area_sel = res_list[0]["Area"] if res_list else 1
+taxa_calc = massa_seco_ciclo / (area_sel * (tempo_cycle / 60))
+status_t, msg_t, cor_t = validar_taxa(taxa_calc, u_produto)
 
-# OPEX
+energia_mes = (20 * disp_h * 30) * 0.65 # OPEX Energia
+n_placas_ref = res_list[0]["Placas"] if res_list else 0
+lonas_mes = ((ciclos_dia * 30) / 2000) * (n_placas_ref * 2) * 450.0 # OPEX Lonas
+total_opex = energia_mes + lonas_mes
 marca = "PEMO (Italia)" if pressao_manual <= 6 else "WEIR (Warman/GEHO)"
 
 # EXIBIÇÃO
-k1, k2, k3 = st.columns(3)
-k1.metric("Taxa de Filtração", f"{taxa_calc:.1f} kg/m².h")
-k2.metric("Vol. Torta/Ciclo", f"{vol_req:.0f} L")
-k3.metric("Bomba", marca)
-
-st.subheader("📋 Resultados de Dimensionamento")
 st.table(res_list)
+st.markdown(f"### Diagnostico: :{cor_t}[{status_t}] - {taxa_calc:.1f} kg/m2.h")
+st.info(msg_t)
 
-# SEMÁFORO VISUAL
-st.markdown(f"### Diagnóstico Micronics: :{cor_t}[{status_t}]")
-st.info(f"**Análise:** {msg_t} (Referência para {produto}: {taxa_calc:.1f} vs Limite Ideal)")
+col_g, col_o = st.columns([2, 1])
+with col_g:
+    buf = gerar_grafico(pressao_manual, vazao_pico)
+    st.image(buf)
+with col_o:
+    st.metric("OPEX Mensal", f"R$ {total_opex:,.2f}")
+    st.success(f"Bomba: {marca}")
 
-col_graf, col_fin = st.columns([2, 1])
-with col_graf:
-    graf_buf = gerar_grafico(pressao_manual, vazao_pico)
-    st.image(graf_buf)
-with col_fin:
-    st.success(f"💰 Bomba Recomendada: {marca}")
+if u_cliente and u_opp and u_resp:
+    d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto}
+    pdf_b = gerar_pdf_final(d_c, res_list, {"total": total_opex}, {"marca": marca}, buf, status_t)
+    st.download_button("📄 Baixar Relatorio V54.1", data=pdf_b, file_name=f"Estudo_{u_opp}.pdf")
