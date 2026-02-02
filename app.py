@@ -6,7 +6,7 @@ from fpdf import FPDF
 import io
 
 # 1. Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V54.8 Master", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V54.9 Master", layout="wide")
 
 # --- FUNÇÕES AUXILIARES ---
 def clean_txt(text):
@@ -52,24 +52,29 @@ def gerar_pdf_final(d_cli, res_list, opex_detalhe, bomba, img_graf, diagnostico,
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(190, 10, clean_txt("ESTUDO TECNICO DE FILTRACAO - V54.8"), ln=True, align="C")
+    pdf.cell(190, 10, clean_txt("ESTUDO TECNICO DE FILTRACAO - V54.9"), ln=True, align="C")
     pdf.ln(5)
     
-    pdf.set_font("Arial", "B", 10)
+    pdf.set_font("Arial", "B", 9)
+    # Bloco Cliente e Localização
     pdf.cell(95, 7, clean_txt(f"Cliente: {d_cli['cliente']}"), 1)
     pdf.cell(95, 7, clean_txt(f"OPP: {d_cli['opp']}"), 1, ln=True)
+    pdf.cell(63, 7, clean_txt(f"Estado: {d_cli['estado']}"), 1)
+    pdf.cell(63, 7, clean_txt(f"Cidade: {d_cli['cidade']}"), 1)
+    pdf.cell(64, 7, clean_txt(f"Contato: {d_cli['contato']}"), 1, ln=True)
+    
+    # Bloco Processo
     pdf.cell(63, 7, clean_txt(f"Material: {d_cli['produto']}"), 1)
     pdf.cell(63, 7, clean_txt(f"Mercado: {d_cli['mercado']}"), 1)
-    pdf.cell(64, 7, clean_txt(f"Estado: {d_cli['estado']}"), 1, ln=True) # Estado no PDF
-    pdf.cell(190, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
+    pdf.cell(64, 7, clean_txt(f"Responsavel: {d_cli['resp']}"), 1, ln=True)
     pdf.ln(5)
 
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(190, 8, clean_txt(f"TAXA: {taxa:.1f} kg/m2.h | STATUS: {diagnostico}"), ln=True, fill=True)
     pdf.ln(5)
 
-    with open("temp_v548.png", "wb") as f: f.write(img_graf.getbuffer())
-    pdf.image("temp_v548.png", x=25, y=None, w=160)
+    with open("temp_v549.png", "wb") as f: f.write(img_graf.getbuffer())
+    pdf.image("temp_v549.png", x=25, y=None, w=160)
     pdf.ln(5)
 
     pdf.set_font("Arial", "B", 9)
@@ -88,7 +93,7 @@ def gerar_pdf_final(d_cli, res_list, opex_detalhe, bomba, img_graf, diagnostico,
     return pdf.output(dest="S").encode("latin-1", "ignore")
 
 # --- INTERFACE ---
-st.title("Cleanova Micronics | Dimensionador V54.8")
+st.title("Cleanova Micronics | Dimensionador V54.9")
 
 # Cabeçalho - Linha 1
 c1, c2, c3 = st.columns(3)
@@ -108,13 +113,15 @@ u_mercado = c5.selectbox("**Mercado**", sorted([
 ]))
 u_resp = c6.text_input("**Responsavel**")
 
-# Cabeçalho - Linha 3 (NOVA)
-c7, c8, c9 = st.columns([1, 2, 2]) # Ajuste de proporção para o Estado não ficar gigante
+# Cabeçalho - Linha 3 (COMPLETA)
+c7, c8, c9 = st.columns(3)
 u_estado = c7.selectbox("**Estado**", sorted([
     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", 
     "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", 
     "SP", "SE", "TO"
 ]))
+u_cidade = c8.text_input("**Cidade**")
+u_contato = c9.text_input("**Contato**")
 
 # Sidebar
 st.sidebar.header("🚀 Processo")
@@ -132,7 +139,7 @@ custo_kwh = st.sidebar.number_input("Custo Energia (R$/kWh)", value=0.65)
 custo_lona_un = st.sidebar.number_input("Preço Lona (R$/unid)", value=450.0)
 vida_lona_ciclos = st.sidebar.number_input("Vida útil lona (Ciclos)", value=2000)
 
-# CÁLCULOS (Lógica mantida)
+# CÁLCULOS
 umidade = umidade_input / 100
 disp_h = 24 * (utilizacao_pct / 100)
 ciclos_dia = (disp_h * 60) / tempo_cycle if tempo_cycle > 0 else 0
@@ -186,7 +193,11 @@ with col_o:
 st.markdown("---")
 if st.button("📄 Gerar Relatorio Tecnico PDF"):
     if u_cliente and u_opp and u_resp:
-        d_c = {"cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, "resp": u_resp, "produto": u_produto, "mercado": u_mercado, "estado": u_estado}
+        d_c = {
+            "cliente": u_cliente, "projeto": u_projeto, "opp": u_opp, 
+            "resp": u_resp, "produto": u_produto, "mercado": u_mercado, 
+            "estado": u_estado, "cidade": u_cidade, "contato": u_contato
+        }
         pdf_b = gerar_pdf_final(d_c, res_list, {"total": total_opex}, marca_bomba, buf, status_t, taxa_calc)
         st.download_button("⬇️ Baixar Estudo", data=pdf_b, file_name=f"Estudo_Micronics_{u_opp}.pdf")
     else:
