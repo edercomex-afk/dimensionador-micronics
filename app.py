@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Dimensionador Micronics V53", layout="wide")
 
 def main():
-    # Cabeçalho Técnico Original
+    # Cabeçalho Técnico Original (Fiel à V53)
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
@@ -14,7 +14,6 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    st.write("")
     st.write("")
 
     # 2. Entrada de Dados
@@ -35,18 +34,14 @@ def main():
         area_filtracao = st.number_input("Área Filtro (m²)", value=150.0)
 
     # 3. Memória de Cálculo
-    # Densidade da Polpa
     rho_polpa = 100 / ((conc_solidos / rho_solido) + ((100 - conc_solidos) / rho_liquido))
-    
-    # Balanço de Massas
     massa_polpa_hora = prod_seca / (conc_solidos / 100)
     vol_polpa_hora = massa_polpa_hora / rho_polpa
     
-    # Resultados Hidráulicos Requisitados
+    # Unidades Críticas Restauradas
     vol_lodo_dia = vol_polpa_hora * horas_op
     vazao_pico_lh = (vol_polpa_hora * 1000) * 1.3
     
-    # Performance
     taxa_especifica = (prod_seca * 1000) / area_filtracao
 
     # 4. Tabela de Resultados Técnica
@@ -77,7 +72,6 @@ def main():
     # 5. Gráfico de Performance (Farol)
     st.header("3. Análise de Performance")
     
-    # Definição de cores original
     if taxa_especifica <= 300:
         cor_grafico = 'green'
         status = "Operação Normal"
@@ -96,7 +90,7 @@ def main():
     ax.set_title(f"Status: {status}")
     st.pyplot(fig)
 
-    # 6. Seleção de Bomba e Fórmulas
+    # 6. Seleção de Hardware e Fórmulas
     st.markdown("---")
     col_f1, col_f2 = st.columns(2)
     
