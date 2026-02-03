@@ -50,7 +50,6 @@ def main():
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
     
-    # Lista de Produtos Atualizada
     produtos = [
         "Concentrado de Cobre", "Rejeito de Cobre", 
         "Concentrado de Grafite", "Rejeito de Grafite",
@@ -59,7 +58,7 @@ def main():
         "Efluente Industrial", "Lodo Biológico", "Outros"
     ]
 
-    # --- SIDEBAR (IDENTIFICAÇÃO COM TÍTULOS EM NEGRITO E CAMPOS VAZIOS) ---
+    # --- SIDEBAR ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
@@ -70,7 +69,7 @@ def main():
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**", value="")
-    estado = col_est.selectbox("**Estado**", estados_br, index=24) # SP Padrão
+    estado = col_est.selectbox("**Estado**", estados_br, index=24)
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
@@ -150,14 +149,17 @@ def main():
         st.write("### Dimensionamento de Ativos")
         st.table(df_results)
         
-        # REGRAS DE STATUS TÉCNICO
-        taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] 
+        # --- CORREÇÃO DO ERRO DE STATUS TÉCNICO ---
+        taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] if len(selecao_final) > 2 else 0
+        
         if taxa_ref > 450:
-            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {tax_ref} kg/m².h excede o limite técnico!")
+            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_ref} kg/m².h excede o limite técnico!")
         elif taxa_ref > 300:
-            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {tax_ref} kg/m².h em zona de alerta.")
+            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_ref} kg/m².h em zona de alerta.")
         elif taxa_ref > 0:
-            st.success(f"✅ **STATUS NORMAL:** Taxa de {tax_ref} kg/m².h ideal.")
+            st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_ref} kg/m².h ideal.")
+        else:
+            st.info("Aguardando inserção de dados para análise de status.")
 
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
@@ -174,9 +176,6 @@ def main():
                 ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
                 ax_perf.grid(True, alpha=0.3)
                 st.pyplot(fig_perf)
-            else:
-                st.write("Insira os parâmetros de processo para visualizar a performance.")
-
         with col_opex:
             st.subheader("Custos e Ciclos")
             st.write(f"**Responsável:** {responsavel if responsavel else '---'}")
