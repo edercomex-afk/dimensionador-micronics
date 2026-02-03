@@ -111,7 +111,7 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO COM FILTRAGEM DE LIMITES ---
+    # --- TABELA DE DIMENSIONAMENTO COM FILTRAGEM ---
     st.write("### Dimensionamento de equipamento")
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 if prod_seca_hora > 0 else 0
     
@@ -126,9 +126,8 @@ def main():
         {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180},
     ]
 
-    opcoes_validas = []
-    primeira_opcao_excedente = None
-
+    opcoes_para_exibir = []
+    
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         area_total = num_placas * f["Area_Placa"]
@@ -143,26 +142,22 @@ def main():
             "LimiteOriginal": f["Limite"]
         }
 
+        # Regra solicitada: Se não excede, adiciona. 
+        # Se excede, mas for o 1500mm, ele será a nossa opção "excedente" limite.
         if not item["Excede"]:
-            opcoes_validas.append(item)
-        elif primeira_opcao_excedente is None:
-            # Captura a primeira opção que exceder (a mais próxima dos limites)
+            opcoes_para_exibir.append(item)
+        elif f["Modelo"] == "1500mm":
             item["Qtd Placas"] = f"⚠ {num_placas} (Excede {f['Limite']})"
-            primeira_opcao_excedente = item
+            opcoes_para_exibir.append(item)
+            break # Para de processar 2000mm e 2500mm se já chegamos ao limite do 1500mm
 
-    # Monta a lista final: válidas + a primeira excedente
-    lista_final = opcoes_validas
-    if primeira_opcao_excedente:
-        lista_final.append(primeira_opcao_excedente)
-
-    df_selecao = pd.DataFrame(lista_final).drop(columns=["Excede", "LimiteOriginal"]) if lista_final else pd.DataFrame()
+    df_selecao = pd.DataFrame(opcoes_para_exibir).drop(columns=["Excede", "LimiteOriginal"]) if opcoes_para_exibir else pd.DataFrame()
     st.table(df_selecao)
 
     # --- REGRAS DE STATUS TÉCNICO ---
     try:
         if not df_selecao.empty:
-            # Usa a última opção válida (ou a única disponível) para o farol
-            taxa_ref = lista_final[-1]["Taxa (kg/m².h)"]
+            taxa_ref = opcoes_para_exibir[-1]["Taxa (kg/m².h)"]
             if taxa_ref > 450:
                 st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração muito alta!")
             elif taxa_ref > 300:
@@ -195,7 +190,7 @@ def main():
         ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
         st.pyplot(fig2)
 
-    # Botão de PDF na Sidebar
+    # Botão de PDF
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
         st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
