@@ -46,14 +46,21 @@ def main():
     """, unsafe_allow_html=True)
 
     # Listas de Seleção
-    estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
-                  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
-    mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
-    produtos = ["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Grafite", "Rejeito de Grafite",
-                "Concentrado de Terras Raras", "Rejeito de Terras Raras", "Concentrado de Ferro", "Rejeito de Ferro",
-                "Efluente Industrial", "Lodo Biológico", "Outros"]
+    estados_br = sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
+                  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"])
+    
+    mercados = sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"])
+    
+    # Lista de Produtos em Ordem Alfabética
+    produtos = sorted([
+        "Concentrado de Cobre", "Rejeito de Cobre", 
+        "Concentrado de Grafite", "Rejeito de Grafite",
+        "Concentrado de Terras Raras", "Rejeito de Terras Raras",
+        "Concentrado de Ferro", "Rejeito de Ferro",
+        "Efluente Industrial", "Lodo Biológico", "Outros"
+    ])
 
-    # --- SIDEBAR (TODOS OS ELEMENTOS EXPOSTOS) ---
+    # --- SIDEBAR ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
@@ -64,14 +71,18 @@ def main():
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**", value="")
-    estado = col_est.selectbox("**Estado**", estados_br, index=24)
+    estado = col_est.selectbox("**Estado**", estados_br, index=estados_br.index("SP") if "SP" in estados_br else 0)
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
     prod_seca_dia = st.sidebar.number_input("**Massa Seca (t/Dia)**", value=0.0)
     prod_seca_hora = st.sidebar.number_input("**Massa Seca (t/h)**", value=0.0)
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
-    disponibilidade_h = st.sidebar.slider("**Disponibilidade de Equipamento (h/dia)**", 1, 24, 20)
+    
+    # Disponibilidade em Porcentagem
+    disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 0, 100, 85)
+    disponibilidade_h = (disponibilidade_perc / 100) * 24
+    
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     
     st.sidebar.divider()
@@ -109,7 +120,7 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO (SEMPRE VISÍVEL) ---
+    # --- TABELA DE DIMENSIONAMENTO ---
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 if prod_seca_hora > 0 else 0
     mapa_filtros = [
         {"Modelo": "800mm", "Vol_Placa": 15, "Area_Placa": 1.1},
@@ -129,7 +140,7 @@ def main():
             "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)
         })
 
-    # --- PDF E ABAS (SEM TRAVAS) ---
+    # --- PDF ---
     df_results = pd.DataFrame(selecao_final)
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
@@ -140,10 +151,10 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
 
     with tab1:
-        st.write("### Dimensionamento de Ativos")
+        st.write("### Dimensionamento de equipamento")
         st.table(df_results)
         
-        taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] 
+        taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] if len(selecao_final) > 2 else 0
         if taxa_ref > 450:
             st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_ref} kg/m².h excede o limite técnico!")
         elif taxa_ref > 300:
@@ -167,7 +178,7 @@ def main():
 
         with col_opex:
             st.subheader("Custos e Ciclos")
-            st.write(f"**Responsável:** {responsavel if responsavel else '---'}")
+            st.write(f"**Disponibilidade Calculada:** {disponibilidade_h:.2f} h/dia")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
