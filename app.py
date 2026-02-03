@@ -49,16 +49,11 @@ def main():
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
-    
-    produtos = [
-        "Concentrado de Cobre", "Rejeito de Cobre", 
-        "Concentrado de Grafite", "Rejeito de Grafite",
-        "Concentrado de Terras Raras", "Rejeito de Terras Raras",
-        "Concentrado de Ferro", "Rejeito de Ferro",
-        "Efluente Industrial", "Lodo Biológico", "Outros"
-    ]
+    produtos = ["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Grafite", "Rejeito de Grafite",
+                "Concentrado de Terras Raras", "Rejeito de Terras Raras", "Concentrado de Ferro", "Rejeito de Ferro",
+                "Efluente Industrial", "Lodo Biológico", "Outros"]
 
-    # --- SIDEBAR ---
+    # --- SIDEBAR (TODOS OS ELEMENTOS EXPOSTOS) ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
@@ -104,7 +99,7 @@ def main():
     except:
         sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = 0.0
 
-    # --- CARDS DE RESUMO OPERACIONAL ---
+    # --- EXPOSIÇÃO TOTAL DOS RESULTADOS ---
     st.write(f"### 🚀 Resumo Operacional: {empresa if empresa else '---'} - {nome_projeto if nome_projeto else '---'}")
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.info(f"**Vol. Lodo/Dia (Calc)**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
@@ -114,7 +109,7 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE SELEÇÃO DE FILTROS ---
+    # --- TABELA DE DIMENSIONAMENTO (SEMPRE VISÍVEL) ---
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 if prod_seca_hora > 0 else 0
     mapa_filtros = [
         {"Modelo": "800mm", "Vol_Placa": 15, "Area_Placa": 1.1},
@@ -134,7 +129,7 @@ def main():
             "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)
         })
 
-    # --- BOTÃO DE PDF NA SIDEBAR ---
+    # --- PDF E ABAS (SEM TRAVAS) ---
     df_results = pd.DataFrame(selecao_final)
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
@@ -142,44 +137,33 @@ def main():
     except:
         pass
 
-    # --- LAYOUT DE ABAS ---
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
 
     with tab1:
         st.write("### Dimensionamento de Ativos")
+        st.table(df_results)
         
-        # Só apresenta a tabela se houver massa seca informada para evitar confusão visual
-        if prod_seca_hora > 0:
-            st.table(df_results)
-            
-            # REGRAS DE STATUS TÉCNICO (Calculado sobre o modelo médio de 1200mm)
-            taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] 
-            if taxa_ref > 450:
-                st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_ref} kg/m².h excede o limite técnico!")
-            elif taxa_ref > 300:
-                st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_ref} kg/m².h em zona de alerta.")
-            else:
-                st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_ref} kg/m².h ideal.")
-
-            tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-            st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
+        taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] 
+        if taxa_ref > 450:
+            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_ref} kg/m².h excede o limite técnico!")
+        elif taxa_ref > 300:
+            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_ref} kg/m².h em zona de alerta.")
         else:
-            st.warning("Aguardando inserção de **Massa Seca (t/h)** para sugerir os equipamentos.")
+            st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_ref} kg/m².h ideal.")
+
+        tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
+        st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
 
     with tab2:
         col_perf, col_opex = st.columns(2)
         with col_perf:
             st.subheader("📈 Performance Dinâmica Estimada")
-            if taxa_fluxo_lodo_m3h > 0:
-                t = np.linspace(1, tempo_ciclo_min, 50)
-                v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 2)) 
-                fig_perf, ax_perf = plt.subplots()
-                ax_perf.plot(t, v_acumulado, color='#003366', linewidth=2)
-                ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
-                ax_perf.grid(True, alpha=0.3)
-                st.pyplot(fig_perf)
-            else:
-                st.write("Insira os parâmetros de processo para visualizar a performance.")
+            t = np.linspace(1, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 50)
+            v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 2)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(50)
+            fig_perf, ax_perf = plt.subplots()
+            ax_perf.plot(t, v_acumulado, color='#003366', linewidth=2)
+            ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
+            st.pyplot(fig_perf)
 
         with col_opex:
             st.subheader("Custos e Ciclos")
