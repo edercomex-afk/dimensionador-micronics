@@ -46,7 +46,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SIDEBAR ---
+    # --- SIDEBAR COMPLETA ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
@@ -65,11 +65,9 @@ def main():
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 1, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
     
-    # Massa Seca Calculada (t/h)
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
     st.sidebar.write(f"⚖️ **Massa Seca (t/h) calculada:** {prod_seca_hora:.3f}")
     
-    vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
     tempo_ciclo_min = st.sidebar.number_input("**Tempo de Ciclo (min)**", value=60)
@@ -82,13 +80,14 @@ def main():
         taxa_fluxo_lodo_m3h = (prod_seca_hora / (conc_solidos / 100)) / sg_lodo if sg_lodo > 0 else 0
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
+        ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
         
         massa_torta_ciclo = (prod_seca_hora * (tempo_ciclo_min / 60)) / (1 - (umidade_torta / 100))
         vol_torta_ciclo_m3 = massa_torta_ciclo / 1.8 
     except:
         sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = 0.0
 
-    # --- RESUMO OPERACIONAL ---
+    # --- RESUMO OPERACIONAL EXPOSTO ---
     st.write(f"### 🚀 Resumo Operacional")
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.info(f"**Vol. Lodo/Dia**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
@@ -98,7 +97,7 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO ---
+    # --- TABELA DE DIMENSIONAMENTO (REGRA DE EXIBIÇÃO RESTAURADA) ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
@@ -106,46 +105,57 @@ def main():
         {"Modelo": "800mm", "Vol_Placa": 15.0, "Area_Placa": 1.10, "Limite": 100},
         {"Modelo": "1000mm", "Vol_Placa": 25.0, "Area_Placa": 1.80, "Limite": 100},
         {"Modelo": "1200mm", "Vol_Placa": 45.0, "Area_Placa": 2.60, "Limite": 100},
-        {"Modelo": "1500mm", "Vol_Placa": 80.0, "Area_Placa": 4.10, "Limite": 150}
+        {"Modelo": "1500mm", "Vol_Placa": 80.0, "Area_Placa": 4.10, "Limite": 150},
+        {"Modelo": "2000mm", "Vol_Placa": 150.0, "Area_Placa": 7.50, "Limite": 180},
+        {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180},
     ]
 
     lista_exibicao = []
+    primeira_fora_encontrada = False
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        if num_placas <= f["Limite"]:
-            area_total = num_placas * f["Area_Placa"]
-            taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
-            lista_exibicao.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)})
+        area_total = num_placas * f["Area_Placa"]
+        taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
+        
+        excede = num_placas > f["Limite"]
+        item = {"Equipamento": f["Modelo"], "Qtd Placas": str(num_placas) if not excede else f"⚠ {num_placas} (Excede {f['Limite']})", "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)}
 
-    df_selecao = pd.DataFrame(lista_exibicao)
-    st.table(df_selecao)
+        if not excede:
+            lista_exibicao.append(item)
+        elif not primeira_fora_encontrada:
+            lista_exibicao.append(item)
+            primeira_fora_encontrada = True
+            # Não damos 'break' aqui para manter a visibilidade, mas filtramos conforme sua lógica anterior
+
+    st.table(pd.DataFrame(lista_exibicao))
 
     # --- GRÁFICO (RESTAURADO COM 2 LINHAS) ---
     st.divider()
     col_graph, col_stats = st.columns([2, 1])
-    
     with col_graph:
         st.subheader("📊 Gráfico de Performance e Saturação")
         t = np.linspace(0, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 100)
-        # Linha Azul: Curva de filtração (Volume acumulado)
         v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
-        # Linha Vermelha: Capacidade Nominal do Equipamento (Set Point)
         v_setpoint = np.full(100, vol_torta_ciclo_m3) if vol_torta_ciclo_m3 > 0 else np.zeros(100)
         
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.plot(t, v_acumulado, label="Volume Filtrado Acumulado", color="#003366", linewidth=2.5)
         ax.plot(t, v_setpoint, label="Capacidade Máxima da Câmara", color="#FF0000", linestyle="--", linewidth=2)
-        ax.set_xlabel("Tempo de Ciclo (min)")
-        ax.set_ylabel("Volume (m³)")
-        ax.legend()
-        ax.grid(True, alpha=0.2)
+        ax.set_xlabel("Tempo de Ciclo (min)"); ax.set_ylabel("Volume (m³)"); ax.legend(); ax.grid(True, alpha=0.2)
         st.pyplot(fig)
 
     with col_stats:
-        st.subheader("⚙️ Status de Operação")
+        st.subheader("⚙️ Custos e Ciclos")
+        st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
-        st.info(f"**Pressão de Trabalho:** {pressao_operacao} Bar")
+        st.info(f"**Pressão:** {pressao_operacao} Bar")
+
+    # Botão de PDF na Sidebar
+    try:
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, pd.DataFrame(lista_exibicao), vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+    except: pass
 
 if __name__ == "__main__":
     main()
