@@ -147,22 +147,24 @@ def main():
 
     with tab1:
         st.write("### Dimensionamento de Ativos")
-        st.table(df_results)
         
-        # --- CORREÇÃO DO ERRO DE STATUS TÉCNICO ---
-        taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] if len(selecao_final) > 2 else 0
-        
-        if taxa_ref > 450:
-            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_ref} kg/m².h excede o limite técnico!")
-        elif taxa_ref > 300:
-            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_ref} kg/m².h em zona de alerta.")
-        elif taxa_ref > 0:
-            st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_ref} kg/m².h ideal.")
-        else:
-            st.info("Aguardando inserção de dados para análise de status.")
+        # Só apresenta a tabela se houver massa seca informada para evitar confusão visual
+        if prod_seca_hora > 0:
+            st.table(df_results)
+            
+            # REGRAS DE STATUS TÉCNICO (Calculado sobre o modelo médio de 1200mm)
+            taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] 
+            if taxa_ref > 450:
+                st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_ref} kg/m².h excede o limite técnico!")
+            elif taxa_ref > 300:
+                st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_ref} kg/m².h em zona de alerta.")
+            else:
+                st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_ref} kg/m².h ideal.")
 
-        tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
+            tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
+            st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
+        else:
+            st.warning("Aguardando inserção de **Massa Seca (t/h)** para sugerir os equipamentos.")
 
     with tab2:
         col_perf, col_opex = st.columns(2)
@@ -176,6 +178,9 @@ def main():
                 ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
                 ax_perf.grid(True, alpha=0.3)
                 st.pyplot(fig_perf)
+            else:
+                st.write("Insira os parâmetros de processo para visualizar a performance.")
+
         with col_opex:
             st.subheader("Custos e Ciclos")
             st.write(f"**Responsável:** {responsavel if responsavel else '---'}")
