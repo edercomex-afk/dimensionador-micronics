@@ -16,7 +16,8 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
     pdf.cell(190, 10, "CLEANOVA MICRONICS - MEMORIAL DE CALCULO", ln=True, align="C")
     pdf.set_font("Arial", "", 12)
     pdf.ln(10)
-    pdf.cell(190, 10, f"Empresa: {empresa}", ln=True)
+    pdf.cell(190, 10, f"Empresa: {empresa}")
+    pdf.ln(7)
     pdf.cell(190, 10, f"Projeto: {projeto} | OPP: {opp}", ln=True)
     pdf.cell(190, 10, f"Responsavel: {responsavel}", ln=True)
     pdf.cell(190, 10, f"Localidade: {cidade}/{estado}", ln=True)
@@ -48,16 +49,10 @@ def main():
     # Listas de Seleção
     estados_br = sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"])
-    
     mercados = sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"])
-    
-    produtos = sorted([
-        "Concentrado de Cobre", "Rejeito de Cobre", 
-        "Concentrado de Grafite", "Rejeito de Grafite",
-        "Concentrado de Terras Raras", "Rejeito de Terras Raras",
-        "Concentrado de Ferro", "Rejeito de Ferro",
-        "Efluente Industrial", "Lodo Biológico", "Outros"
-    ])
+    produtos = sorted(["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Grafite", "Rejeito de Grafite",
+                "Concentrado de Terras Raras", "Rejeito de Terras Raras", "Concentrado de Ferro", "Rejeito de Ferro",
+                "Efluente Industrial", "Lodo Biológico", "Outros"])
 
     # --- SIDEBAR ---
     st.sidebar.header("📋 Identificação do Projeto")
@@ -77,10 +72,8 @@ def main():
     prod_seca_dia = st.sidebar.number_input("**Massa Seca (t/Dia)**", value=0.0)
     prod_seca_hora = st.sidebar.number_input("**Massa Seca (t/h)**", value=0.0)
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
-    
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 0, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
-    
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     
     st.sidebar.divider()
@@ -118,7 +111,7 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO COM NOVOS LIMITES ---
+    # --- TABELA DE DIMENSIONAMENTO COM FILTRAGEM DE LIMITES ---
     st.write("### Dimensionamento de equipamento")
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 if prod_seca_hora > 0 else 0
     
@@ -133,43 +126,56 @@ def main():
         {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180},
     ]
 
-    selecao_final = []
+    opcoes_validas = []
+    primeira_opcao_excedente = None
+
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         area_total = num_placas * f["Area_Placa"]
         taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
         
-        # Lógica de Limite de Placas
-        status_placas = str(num_placas)
-        if num_placas > f["Limite"]:
-            status_placas = f"⚠ {num_placas} (Excede {f['Limite']})"
-            
-        selecao_final.append({
+        item = {
             "Equipamento": f["Modelo"], 
-            "Qtd Placas": status_placas,
+            "Qtd Placas": str(num_placas),
             "Área Total (m²)": round(area_total, 2), 
-            "Taxa (kg/m².h)": round(taxa_filt, 2)
-        })
+            "Taxa (kg/m².h)": round(taxa_filt, 2),
+            "Excede": num_placas > f["Limite"],
+            "LimiteOriginal": f["Limite"]
+        }
 
-    st.table(pd.DataFrame(selecao_final))
+        if not item["Excede"]:
+            opcoes_validas.append(item)
+        elif primeira_opcao_excedente is None:
+            # Captura a primeira opção que exceder (a mais próxima dos limites)
+            item["Qtd Placas"] = f"⚠ {num_placas} (Excede {f['Limite']})"
+            primeira_opcao_excedente = item
+
+    # Monta a lista final: válidas + a primeira excedente
+    lista_final = opcoes_validas
+    if primeira_opcao_excedente:
+        lista_final.append(primeira_opcao_excedente)
+
+    df_selecao = pd.DataFrame(lista_final).drop(columns=["Excede", "LimiteOriginal"]) if lista_final else pd.DataFrame()
+    st.table(df_selecao)
 
     # --- REGRAS DE STATUS TÉCNICO ---
-    # Usando o modelo 1200mm como referência para o farol, se válido
     try:
-        taxa_ref = (prod_seca_hora * 1000) / (mapa_filtros[4]["Area_Placa"] * math.ceil((vol_torta_ciclo_m3 * 1000) / mapa_filtros[4]["Vol_Placa"])) if prod_seca_hora > 0 else 0
-        if taxa_ref > 450:
-            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa excedida em modelos de médio porte!")
-        elif taxa_ref > 300:
-            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Operação em zona de alta pressão.")
-        elif taxa_ref > 0:
-            st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos equilibrados.")
+        if not df_selecao.empty:
+            # Usa a última opção válida (ou a única disponível) para o farol
+            taxa_ref = lista_final[-1]["Taxa (kg/m².h)"]
+            if taxa_ref > 450:
+                st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração muito alta!")
+            elif taxa_ref > 300:
+                st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando em zona de alerta.")
+            elif taxa_ref > 0:
+                st.success(f"✅ **STATUS NORMAL:** Parâmetros de filtração otimizados.")
     except:
         pass
 
     tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
     st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
 
-    # --- GRÁFICO E OPEX ---
+    # --- GRÁFICOS E OPEX ---
     col_perf, col_opex = st.columns(2)
     with col_perf:
         st.subheader("📈 Performance Dinâmica Estimada")
@@ -188,6 +194,13 @@ def main():
         fig2, ax2 = plt.subplots(figsize=(4, 4))
         ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
         st.pyplot(fig2)
+
+    # Botão de PDF na Sidebar
+    try:
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+    except:
+        pass
 
 if __name__ == "__main__":
     main()
