@@ -75,6 +75,7 @@ def main():
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 0, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
+    umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0) # CAMPO RECUPERADO
     
     st.sidebar.divider()
     st.sidebar.header("🧬 **Densidade e Geometria**")
@@ -96,10 +97,13 @@ def main():
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
         ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
-        trocas_lona_ano = (ciclos_dia * 365) / vida_util_lona if vida_util_lona > 0 else 0
         custo_energia_diario = disponibilidade_h * custo_kwh_hora
+        
+        # Cálculo de Volume de Torta por ciclo considerando a umidade
+        massa_torta_ciclo = (prod_seca_hora * (tempo_ciclo_min / 60)) / (1 - (umidade_torta / 100))
+        vol_torta_ciclo_m3 = massa_torta_ciclo / 1.8 # Densidade aparente média da torta
     except:
-        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = 0.0
+        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = 0.0
 
     # --- RESUMO OPERACIONAL ---
     st.write(f"### 🚀 Resumo Operacional: {empresa if empresa else '---'} - {nome_projeto if nome_projeto else '---'}")
@@ -111,9 +115,8 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO (REGRA: APENAS OPÇÕES VÁLIDAS) ---
+    # --- TABELA DE DIMENSIONAMENTO ---
     st.write("### Dimensionamento de equipamento")
-    vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 if prod_seca_hora > 0 else 0
     
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
@@ -131,7 +134,6 @@ def main():
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         
-        # Só adiciona à lista se não exceder o limite
         if num_placas <= f["Limite"]:
             area_total = num_placas * f["Area_Placa"]
             taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
@@ -176,7 +178,7 @@ def main():
 
     with col_opex:
         st.subheader("Custos e Ciclos")
-        st.write(f"**Disponibilidade Calculada:** {disponibilidade_h:.2f} h/dia")
+        st.write(f"**Umidade Alvo:** {umidade_torta}%")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
         fig2, ax2 = plt.subplots(figsize=(4, 4))
