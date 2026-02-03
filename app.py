@@ -111,7 +111,7 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO ---
+    # --- TABELA DE DIMENSIONAMENTO (REGRA: APENAS OPÇÕES VÁLIDAS) ---
     st.write("### Dimensionamento de equipamento")
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 if prod_seca_hora > 0 else 0
     
@@ -127,30 +127,22 @@ def main():
     ]
 
     lista_exibicao = []
-    primeira_fora_encontrada = False
     
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        area_total = num_placas * f["Area_Placa"]
-        taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
         
-        excede = num_placas > f["Limite"]
-        
-        item = {
-            "Equipamento": f["Modelo"], 
-            "Qtd Placas": str(num_placas) if not excede else f"⚠ {num_placas} (Excede {f['Limite']})",
-            "Área Total (m²)": round(area_total, 2), 
-            "Taxa (kg/m².h)": round(taxa_filt, 2)
-        }
-
-        if not excede:
-            # Opções dentro do limite são sempre adicionadas
+        # Só adiciona à lista se não exceder o limite
+        if num_placas <= f["Limite"]:
+            area_total = num_placas * f["Area_Placa"]
+            taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
+            
+            item = {
+                "Equipamento": f["Modelo"], 
+                "Qtd Placas": int(num_placas),
+                "Área Total (m²)": round(area_total, 2), 
+                "Taxa (kg/m².h)": round(taxa_filt, 2)
+            }
             lista_exibicao.append(item)
-        elif not primeira_fora_encontrada:
-            # Adiciona apenas a PRIMEIRA que estiver fora do limite
-            lista_exibicao.append(item)
-            primeira_fora_encontrada = True
-            break # Interrompe o loop para não mostrar mais opções grandes demais
 
     df_selecao = pd.DataFrame(lista_exibicao) if lista_exibicao else pd.DataFrame()
     st.table(df_selecao)
