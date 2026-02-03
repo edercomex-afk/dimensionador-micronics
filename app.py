@@ -20,11 +20,11 @@ def main():
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
 
-    # --- SIDEBAR ---
+    # --- SIDEBAR (IDENTIFICAÇÃO COM NOVA HIERARQUIA) ---
     st.sidebar.header("📋 Identificação do Projeto")
+    empresa = st.sidebar.text_input("Empresa", value="Cliente S/A")
     nome_projeto = st.sidebar.text_input("Nome do Projeto", value="Projeto Exemplo")
     num_opp = st.sidebar.text_input("N° de OPP", value="000/2026")
-    empresa = st.sidebar.text_input("Empresa", value="Cliente S/A")
     responsavel = st.sidebar.text_input("Responsável pelo Projeto", value="Eder")
     
     col_cid, col_est = st.sidebar.columns(2)
@@ -51,7 +51,7 @@ def main():
     custo_kwh_hora = st.sidebar.number_input("Custo do KWH por hora (R$/h)", value=15.50)
     pressao_operacao = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
 
-    # --- CÁLCULOS ---
+    # --- NÚCLEO DE CÁLCULO ---
     sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos))
     massa_polpa_hora = prod_seca_hora / (conc_solidos / 100)
     taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo
@@ -61,8 +61,8 @@ def main():
     trocas_lona_ano = (ciclos_dia * 365) / vida_util_lona
     custo_energia_diario = disponibilidade_h * custo_kwh_hora
 
-    # --- CARDS DE RESUMO ---
-    st.write(f"### 🚀 Resumo Operacional: {nome_projeto}")
+    # --- CARDS DE RESUMO OPERACIONAL ---
+    st.write(f"### 🚀 Resumo Operacional: {empresa} - {nome_projeto}")
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.info(f"**Vol. Lodo/Dia (Calc)**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
     with c2: st.info(f"**Taxa Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
@@ -71,7 +71,7 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE SELEÇÃO ---
+    # --- TABELA DE SELEÇÃO DE FILTROS ---
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 
     mapa_filtros = [
         {"Modelo": "800mm", "Vol_Placa": 15, "Area_Placa": 1.1},
@@ -80,29 +80,35 @@ def main():
         {"Modelo": "1500mm", "Vol_Placa": 80, "Area_Placa": 4.1},
         {"Modelo": "2000mm", "Vol_Placa": 150, "Area_Placa": 7.5},
     ]
+
     selecao_final = []
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"])
         area_total = num_placas * f["Area_Placa"]
         taxa_filt = (prod_seca_hora * 1000) / area_total
-        selecao_final.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)})
+        selecao_final.append({
+            "Equipamento": f["Modelo"],
+            "Qtd Placas": int(num_placas),
+            "Área Total (m²)": round(area_total, 2),
+            "Taxa (kg/m².h)": round(taxa_filt, 2)
+        })
 
-    # --- ABAS ---
+    # --- LAYOUT DE ABAS ---
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
 
     with tab1:
+        st.write(f"**Localidade:** {cidade}/{estado} | **OPP:** {num_opp}")
         st.table(pd.DataFrame(selecao_final))
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.success(f"Hardware Sugerido: Bomba **{tipo_bomba}**.")
+        st.success(f"Hardware Sugerido: Bomba **{tipo_bomba}** para operação em {pressao_operacao} Bar.")
 
     with tab2:
         col_perf, col_opex = st.columns(2)
         
         with col_perf:
             st.subheader("📈 Performance Dinâmica Estimada")
-            # Gráfico de Curva de Filtração (Simulação)
+            # Gráfico de Curva de Filtração (Simulação V53)
             t = np.linspace(1, tempo_ciclo_min, 50)
-            # Modelo de decaimento parabólico invertido típico de filtração
             v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 2)) 
             fig_perf, ax_perf = plt.subplots()
             ax_perf.plot(t, v_acumulado, color='#003366', linewidth=2, label="Volume Filtrado")
@@ -110,14 +116,14 @@ def main():
             ax_perf.set_ylabel("Volume Acumulado (m³)")
             ax_perf.grid(True, alpha=0.3)
             st.pyplot(fig_perf)
-            st.caption("Curva estimada baseada na taxa de fluxo e tempo de ciclo.")
+            st.caption("Projeção de acumulação de volume por ciclo.")
 
         with col_opex:
-            st.subheader("Custos e Manutenção")
-            st.write(f"**Trocas de Lona/Ano:** {trocas_lona_ano:.2f}")
+            st.subheader("Custos e Ciclos")
+            st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
-            ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Peças'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
+            ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
             st.pyplot(fig2)
 
 if __name__ == "__main__":
