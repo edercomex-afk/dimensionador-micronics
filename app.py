@@ -57,7 +57,8 @@ def main():
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**")
-    estado = col_est.selectbox("**Estado**", sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]), index=24)
+    estados_br = sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"])
+    estado = col_est.selectbox("**Estado**", estados_br, index=24)
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
@@ -68,19 +69,19 @@ def main():
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
     st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
     
-    # CAMPO RESTAURADO AQUI
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
-    
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
     
     st.sidebar.divider()
     st.sidebar.header("🧬 **Densidade e Geometria**")
-    sg_solido = st.sidebar.number_input("**SG Sólido (g/cm³)**", value=2.70)
+    # NOMENCLATURA ATUALIZADA
+    sg_solido = st.sidebar.number_input("**Gravidade especifica dos Sólidos Secos (g/cm³)**", value=2.70)
     espessura_camara = st.sidebar.number_input("**Espessura da Câmara (mm)**", value=40)
     
     st.sidebar.divider()
     st.sidebar.header("🔄 **Ciclos e Operação**")
+    vida_util_lona = st.sidebar.number_input("**Vida Útil da Lona (Ciclos)**", value=2000)
     tempo_ciclo_min = st.sidebar.number_input("**Tempo de Ciclo (min)**", value=60)
     custo_kwh_hora = st.sidebar.number_input("**Custo do KWH por hora (R$/h)**", value=0.0)
     pressao_operacao = st.sidebar.slider("**Pressão de Filtração (Bar)**", 1, 15, 6)
@@ -133,7 +134,7 @@ def main():
     df_selecao = pd.DataFrame(lista_exibicao)
     st.table(df_selecao)
 
-    # --- GRÁFICO E OPEX ---
+    # --- GRÁFICO ---
     st.divider()
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
@@ -160,7 +161,7 @@ def main():
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
         st.info(f"**Pressão:** {pressao_operacao} Bar")
 
-    # PDF
+    # Botão de PDF
     st.sidebar.divider()
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
