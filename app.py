@@ -52,7 +52,24 @@ def main():
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**")
     num_opp = st.sidebar.text_input("**N° de OPP**")
     mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
-    produto_sel = st.sidebar.selectbox("**Produto**", sorted(["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Ferro", "Efluente Industrial", "Lodo Biológico", "Outros"]))
+    
+    # LISTA DE PRODUTOS RESTAURADA E ATUALIZADA EM ORDEM ALFABÉTICA
+    produtos = sorted([
+        "Concentrado de Cobre", 
+        "Concentrado de Ferro", 
+        "Concentrado de Grafite", 
+        "Concentrado de Ouro", 
+        "Concentrado de Terras Raras",
+        "Efluente Industrial", 
+        "Lodo Biológico", 
+        "Rejeito de Cobre", 
+        "Rejeito de Ferro", 
+        "Rejeito de Grafite", 
+        "Rejeito de Terras Raras",
+        "Outros"
+    ])
+    produto_sel = st.sidebar.selectbox("**Produto**", produtos)
+    
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**")
     
     col_cid, col_est = st.sidebar.columns(2)
@@ -75,7 +92,6 @@ def main():
     
     st.sidebar.divider()
     st.sidebar.header("🧬 **Densidade e Geometria**")
-    # NOMENCLATURA ATUALIZADA
     sg_solido = st.sidebar.number_input("**Gravidade especifica dos Sólidos Secos (g/cm³)**", value=2.70)
     espessura_camara = st.sidebar.number_input("**Espessura da Câmara (mm)**", value=40)
     
