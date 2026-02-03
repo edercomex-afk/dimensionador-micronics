@@ -49,13 +49,19 @@ def main():
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
+    # Adicionada lista de produtos para a caixa de seleção
+    produtos = ["Concentrado de Cobre", "Concentrado de Ferro", "Rejeito", "Efluente Industrial", "Lodo Biológico", "Outros"]
 
     # --- SIDEBAR ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
     num_opp = st.sidebar.text_input("**N° de OPP**", value="")
+    
     mercado_sel = st.sidebar.selectbox("**Mercado**", mercados)
+    # Box Produto restaurado como caixa de seleção
+    produto_sel = st.sidebar.selectbox("**Produto**", produtos)
+    
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**", value="")
     
     col_cid, col_est = st.sidebar.columns(2)
@@ -140,14 +146,14 @@ def main():
         st.write("### Dimensionamento de Ativos")
         st.table(df_results)
         
-        # --- REGRAS DE STATUS TÉCNICO (PRESERVADAS) ---
-        taxa_referencia = selecao_final[2]["Taxa (kg/m².h)"] # Usando 1200mm como referência visual
+        # --- REGRAS DE STATUS TÉCNICO ---
+        taxa_referencia = selecao_final[2]["Taxa (kg/m².h)"] 
         if taxa_referencia > 450:
-            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_referencia} kg/m².h excede o limite técnico de segurança!")
+            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_referencia} kg/m².h excede o limite técnico!")
         elif taxa_referencia > 300:
-            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_referencia} kg/m².h operando em zona de alerta.")
+            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_referencia} kg/m².h em zona de alerta.")
         else:
-            st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_referencia} kg/m².h dentro dos parâmetros ideais.")
+            st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_referencia} kg/m².h ideal.")
 
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
@@ -165,6 +171,7 @@ def main():
                 st.pyplot(fig_perf)
         with col_opex:
             st.subheader("Custos e Ciclos")
+            st.write(f"**Produto Selecionado:** {produto_sel}")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
