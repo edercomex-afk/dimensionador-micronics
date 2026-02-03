@@ -104,11 +104,11 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
 
     with tab1:
-        # Removidas as informações redundantes que apareciam aqui
         st.write("### Dimensionamento de Ativos")
         st.table(pd.DataFrame(selecao_final))
+        # Atualizado para "Bomba Sugerida"
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.success(f"Hardware Sugerido: Bomba **{tipo_bomba}** para operação em {pressao_operacao} Bar.")
+        st.success(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
 
     with tab2:
         col_perf, col_opex = st.columns(2)
