@@ -111,7 +111,7 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO COM FILTRAGEM ---
+    # --- TABELA DE DIMENSIONAMENTO ---
     st.write("### Dimensionamento de equipamento")
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 if prod_seca_hora > 0 else 0
     
@@ -126,44 +126,45 @@ def main():
         {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180},
     ]
 
-    opcoes_para_exibir = []
+    lista_exibicao = []
+    primeira_fora_encontrada = False
     
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         area_total = num_placas * f["Area_Placa"]
         taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
         
+        excede = num_placas > f["Limite"]
+        
         item = {
             "Equipamento": f["Modelo"], 
-            "Qtd Placas": str(num_placas),
+            "Qtd Placas": str(num_placas) if not excede else f"⚠ {num_placas} (Excede {f['Limite']})",
             "Área Total (m²)": round(area_total, 2), 
-            "Taxa (kg/m².h)": round(taxa_filt, 2),
-            "Excede": num_placas > f["Limite"],
-            "LimiteOriginal": f["Limite"]
+            "Taxa (kg/m².h)": round(taxa_filt, 2)
         }
 
-        # Regra solicitada: Se não excede, adiciona. 
-        # Se excede, mas for o 1500mm, ele será a nossa opção "excedente" limite.
-        if not item["Excede"]:
-            opcoes_para_exibir.append(item)
-        elif f["Modelo"] == "1500mm":
-            item["Qtd Placas"] = f"⚠ {num_placas} (Excede {f['Limite']})"
-            opcoes_para_exibir.append(item)
-            break # Para de processar 2000mm e 2500mm se já chegamos ao limite do 1500mm
+        if not excede:
+            # Opções dentro do limite são sempre adicionadas
+            lista_exibicao.append(item)
+        elif not primeira_fora_encontrada:
+            # Adiciona apenas a PRIMEIRA que estiver fora do limite
+            lista_exibicao.append(item)
+            primeira_fora_encontrada = True
+            break # Interrompe o loop para não mostrar mais opções grandes demais
 
-    df_selecao = pd.DataFrame(opcoes_para_exibir).drop(columns=["Excede", "LimiteOriginal"]) if opcoes_para_exibir else pd.DataFrame()
+    df_selecao = pd.DataFrame(lista_exibicao) if lista_exibicao else pd.DataFrame()
     st.table(df_selecao)
 
     # --- REGRAS DE STATUS TÉCNICO ---
     try:
         if not df_selecao.empty:
-            taxa_ref = opcoes_para_exibir[-1]["Taxa (kg/m².h)"]
+            taxa_ref = lista_exibicao[-1]["Taxa (kg/m².h)"]
             if taxa_ref > 450:
-                st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração muito alta!")
+                st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
             elif taxa_ref > 300:
-                st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando em zona de alerta.")
+                st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite de pressão.")
             elif taxa_ref > 0:
-                st.success(f"✅ **STATUS NORMAL:** Parâmetros de filtração otimizados.")
+                st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
     except:
         pass
 
