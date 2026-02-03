@@ -46,18 +46,24 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SIDEBAR COMPLETA ---
+    # --- SIDEBAR COMPLETA RESTAURADA ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
     num_opp = st.sidebar.text_input("**N° de OPP**", value="")
-    mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
-    produto_sel = st.sidebar.selectbox("**Produto**", sorted(["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Ferro", "Efluente Industrial", "Lodo Biológico", "Outros"]))
+    
+    mercados = sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"])
+    mercado_sel = st.sidebar.selectbox("**Mercado**", mercados)
+    
+    produtos = sorted(["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Ferro", "Efluente Industrial", "Lodo Biológico", "Concentrado de Grafite", "Rejeito de Grafite", "Terras Raras", "Outros"])
+    produto_sel = st.sidebar.selectbox("**Produto**", produtos)
+    
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**", value="")
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**", value="")
-    estado = col_est.selectbox("**Estado**", sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]), index=24)
+    estados_br = sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"])
+    estado = col_est.selectbox("**Estado**", estados_br, index=estados_br.index("SP"))
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
@@ -65,19 +71,31 @@ def main():
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 1, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
     
+    # Automação da Massa Seca horária exposta na sidebar
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
-    st.sidebar.write(f"⚖️ **Massa Seca (t/h) calculada:** {prod_seca_hora:.3f}")
+    st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
     
+    vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
+
+    st.sidebar.divider()
+    st.sidebar.header("🧬 **Densidade e Geometria**")
+    sg_solido = st.sidebar.number_input("**SG Sólido (g/cm³)**", value=2.70, format="%.2f")
+    espessura_camara = st.sidebar.number_input("**Espessura da Câmara (mm)**", value=40, step=1)
+    
+    st.sidebar.divider()
+    st.sidebar.header("🔄 **Ciclos e Operação**")
+    vida_util_lona = st.sidebar.number_input("**Vida Útil da Lona (Ciclos)**", value=2000)
     tempo_ciclo_min = st.sidebar.number_input("**Tempo de Ciclo (min)**", value=60)
+    custo_kwh_hora = st.sidebar.number_input("**Custo do KWH por hora (R$/h)**", value=0.0)
     pressao_operacao = st.sidebar.slider("**Pressão de Filtração (Bar)**", 1, 15, 6)
 
     # --- NÚCLEO DE CÁLCULO ---
     try:
-        sg_solido = 2.7
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 0
-        taxa_fluxo_lodo_m3h = (prod_seca_hora / (conc_solidos / 100)) / sg_lodo if sg_lodo > 0 else 0
+        massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
+        taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo if sg_lodo > 0 else 0
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
         ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
@@ -87,7 +105,7 @@ def main():
     except:
         sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = 0.0
 
-    # --- RESUMO OPERACIONAL EXPOSTO ---
+    # --- PAINEL PRINCIPAL ---
     st.write(f"### 🚀 Resumo Operacional")
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.info(f"**Vol. Lodo/Dia**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
@@ -97,7 +115,6 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO (REGRA DE EXIBIÇÃO RESTAURADA) ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
@@ -111,7 +128,7 @@ def main():
     ]
 
     lista_exibicao = []
-    primeira_fora_encontrada = False
+    primeira_fora = False
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         area_total = num_placas * f["Area_Placa"]
@@ -122,14 +139,14 @@ def main():
 
         if not excede:
             lista_exibicao.append(item)
-        elif not primeira_fora_encontrada:
+        elif not primeira_fora:
             lista_exibicao.append(item)
-            primeira_fora_encontrada = True
-            # Não damos 'break' aqui para manter a visibilidade, mas filtramos conforme sua lógica anterior
+            primeira_fora = True
+            break
 
     st.table(pd.DataFrame(lista_exibicao))
 
-    # --- GRÁFICO (RESTAURADO COM 2 LINHAS) ---
+    # --- GRÁFICO DUAS LINHAS ---
     st.divider()
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
@@ -145,16 +162,16 @@ def main():
         st.pyplot(fig)
 
     with col_stats:
-        st.subheader("⚙️ Custos e Ciclos")
+        st.subheader("⚙️ Status")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.success(f"**Bomba Sugerida:** {tipo_bomba}")
+        st.success(f"**Bomba:** {tipo_bomba}")
         st.info(f"**Pressão:** {pressao_operacao} Bar")
 
-    # Botão de PDF na Sidebar
+    # PDF
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, pd.DataFrame(lista_exibicao), vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
-        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+        st.sidebar.download_button(label="📥 Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
     except: pass
 
 if __name__ == "__main__":
