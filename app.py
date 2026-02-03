@@ -52,13 +52,12 @@ def main():
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**")
     num_opp = st.sidebar.text_input("**N° de OPP**")
     mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
-    produto_sel = st.sidebar.selectbox("**Produto**", sorted(["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Ferro", "Efluente Industrial", "Lodo Biológico", "Concentrado de Grafite", "Rejeito de Grafite", "Terras Raras", "Outros"]))
+    produto_sel = st.sidebar.selectbox("**Produto**", sorted(["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Ferro", "Efluente Industrial", "Lodo Biológico", "Outros"]))
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**")
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**")
-    estados_br = sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"])
-    estado = col_est.selectbox("**Estado**", estados_br, index=24)
+    estado = col_est.selectbox("**Estado**", sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]), index=24)
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
@@ -68,6 +67,9 @@ def main():
     
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
     st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
+    
+    # CAMPO RESTAURADO AQUI
+    vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
@@ -79,7 +81,6 @@ def main():
     
     st.sidebar.divider()
     st.sidebar.header("🔄 **Ciclos e Operação**")
-    vida_util_lona = st.sidebar.number_input("**Vida Útil da Lona (Ciclos)**", value=2000)
     tempo_ciclo_min = st.sidebar.number_input("**Tempo de Ciclo (min)**", value=60)
     custo_kwh_hora = st.sidebar.number_input("**Custo do KWH por hora (R$/h)**", value=0.0)
     pressao_operacao = st.sidebar.slider("**Pressão de Filtração (Bar)**", 1, 15, 6)
@@ -109,7 +110,6 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO (REGRA: APENAS DENTRO DO LIMITE) ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
@@ -125,16 +125,10 @@ def main():
     lista_exibicao = []
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        # FILTRO RÍGIDO: Somente se estiver dentro do limite
         if num_placas <= f["Limite"] and num_placas > 0:
             area_total = num_placas * f["Area_Placa"]
             taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
-            lista_exibicao.append({
-                "Equipamento": f["Modelo"], 
-                "Qtd Placas": int(num_placas), 
-                "Área Total (m²)": round(area_total, 2), 
-                "Taxa (kg/m².h)": round(taxa_filt, 2)
-            })
+            lista_exibicao.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)})
 
     df_selecao = pd.DataFrame(lista_exibicao)
     st.table(df_selecao)
@@ -166,7 +160,7 @@ def main():
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
         st.info(f"**Pressão:** {pressao_operacao} Bar")
 
-    # Botão de PDF
+    # PDF
     st.sidebar.divider()
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
