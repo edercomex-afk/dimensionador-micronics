@@ -16,16 +16,23 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # Lista de Estados do Brasil
+    # Listas de Seleção
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
+    
+    mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
 
     # --- SIDEBAR (IDENTIFICAÇÃO COM TÍTULOS EM NEGRITO E CAMPOS VAZIOS) ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
     num_opp = st.sidebar.text_input("**N° de OPP**", value="")
-    responsavel = st.sidebar.text_input("**Responsável pelo Projeto**", value="Eder")
+    
+    # Mercado como caixa de seleção
+    mercado_sel = st.sidebar.selectbox("**Mercado**", mercados)
+    
+    # Responsável em branco conforme pedido
+    responsavel = st.sidebar.text_input("**Responsável pelo Projeto**", value="")
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**", value="")
@@ -52,7 +59,6 @@ def main():
     pressao_operacao = st.sidebar.slider("**Pressão de Filtração (Bar)**", 1, 15, 6)
 
     # --- NÚCLEO DE CÁLCULO ---
-    # Prevenção de divisão por zero caso campos estejam vazios
     try:
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 0
         massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
@@ -101,6 +107,7 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
 
     with tab1:
+        st.write(f"**Empresa:** {empresa if empresa else '---'} | **Mercado:** {mercado_sel}")
         st.write(f"**Localidade:** {cidade if cidade else '---'}/{estado} | **OPP:** {num_opp if num_opp else '---'}")
         st.table(pd.DataFrame(selecao_final))
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
@@ -125,6 +132,7 @@ def main():
 
         with col_opex:
             st.subheader("Custos e Ciclos")
+            st.write(f"**Responsável:** {responsavel if responsavel else '---'}")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
