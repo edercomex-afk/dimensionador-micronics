@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import math
 import numpy as np
 from fpdf import FPDF
-import base64
 
 # 1. Configuração de Página
 st.set_page_config(page_title="Dimensionador Micronics V53", layout="wide")
@@ -126,10 +125,13 @@ def main():
             "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)
         })
 
-    # --- BOTÃO DE PDF ---
+    # --- BOTÃO DE PDF NA SIDEBAR ---
     df_results = pd.DataFrame(selecao_final)
-    pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
-    st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+    try:
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+    except:
+        st.sidebar.warning("Preencha os dados para habilitar o PDF.")
 
     # --- LAYOUT DE ABAS ---
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
@@ -137,8 +139,18 @@ def main():
     with tab1:
         st.write("### Dimensionamento de Ativos")
         st.table(df_results)
+        
+        # --- REGRAS DE STATUS TÉCNICO (PRESERVADAS) ---
+        taxa_referencia = selecao_final[2]["Taxa (kg/m².h)"] # Usando 1200mm como referência visual
+        if taxa_referencia > 450:
+            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_referencia} kg/m².h excede o limite técnico de segurança!")
+        elif taxa_referencia > 300:
+            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_referencia} kg/m².h operando em zona de alerta.")
+        else:
+            st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_referencia} kg/m².h dentro dos parâmetros ideais.")
+
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.success(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
+        st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
 
     with tab2:
         col_perf, col_opex = st.columns(2)
