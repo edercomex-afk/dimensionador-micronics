@@ -28,10 +28,7 @@ def main():
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
     num_opp = st.sidebar.text_input("**N° de OPP**", value="")
     
-    # Mercado como caixa de seleção
     mercado_sel = st.sidebar.selectbox("**Mercado**", mercados)
-    
-    # Responsável em branco conforme pedido
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**", value="")
     
     col_cid, col_est = st.sidebar.columns(2)
@@ -107,8 +104,8 @@ def main():
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
 
     with tab1:
-        st.write(f"**Empresa:** {empresa if empresa else '---'} | **Mercado:** {mercado_sel}")
-        st.write(f"**Localidade:** {cidade if cidade else '---'}/{estado} | **OPP:** {num_opp if num_opp else '---'}")
+        # Removidas as informações redundantes que apareciam aqui
+        st.write("### Dimensionamento de Ativos")
         st.table(pd.DataFrame(selecao_final))
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"Hardware Sugerido: Bomba **{tipo_bomba}** para operação em {pressao_operacao} Bar.")
