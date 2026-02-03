@@ -51,7 +51,6 @@ def main():
     
     mercados = sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"])
     
-    # Lista de Produtos em Ordem Alfabética
     produtos = sorted([
         "Concentrado de Cobre", "Rejeito de Cobre", 
         "Concentrado de Grafite", "Rejeito de Grafite",
@@ -79,7 +78,6 @@ def main():
     prod_seca_hora = st.sidebar.number_input("**Massa Seca (t/h)**", value=0.0)
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     
-    # Disponibilidade em Porcentagem
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 0, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
     
@@ -110,7 +108,7 @@ def main():
     except:
         sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = 0.0
 
-    # --- EXPOSIÇÃO TOTAL DOS RESULTADOS ---
+    # --- RESUMO OPERACIONAL ---
     st.write(f"### 🚀 Resumo Operacional: {empresa if empresa else '---'} - {nome_projeto if nome_projeto else '---'}")
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.info(f"**Vol. Lodo/Dia (Calc)**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
@@ -120,14 +118,19 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO ---
+    # --- TABELA DE DIMENSIONAMENTO COM NOVOS LIMITES ---
+    st.write("### Dimensionamento de equipamento")
     vol_torta_ciclo_m3 = (prod_seca_hora * (tempo_ciclo_min/60)) / 1.8 if prod_seca_hora > 0 else 0
+    
     mapa_filtros = [
-        {"Modelo": "800mm", "Vol_Placa": 15, "Area_Placa": 1.1},
-        {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
-        {"Modelo": "1200mm", "Vol_Placa": 45, "Area_Placa": 2.6},
-        {"Modelo": "1500mm", "Vol_Placa": 80, "Area_Placa": 4.1},
-        {"Modelo": "2000mm", "Vol_Placa": 150, "Area_Placa": 7.5},
+        {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
+        {"Modelo": "630mm", "Vol_Placa": 11.5, "Area_Placa": 0.70, "Limite": 90},
+        {"Modelo": "800mm", "Vol_Placa": 15.0, "Area_Placa": 1.10, "Limite": 100},
+        {"Modelo": "1000mm", "Vol_Placa": 25.0, "Area_Placa": 1.80, "Limite": 100},
+        {"Modelo": "1200mm", "Vol_Placa": 45.0, "Area_Placa": 2.60, "Limite": 100},
+        {"Modelo": "1500mm", "Vol_Placa": 80.0, "Area_Placa": 4.10, "Limite": 150},
+        {"Modelo": "2000mm", "Vol_Placa": 150.0, "Area_Placa": 7.50, "Limite": 180},
+        {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180},
     ]
 
     selecao_final = []
@@ -135,55 +138,56 @@ def main():
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         area_total = num_placas * f["Area_Placa"]
         taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
+        
+        # Lógica de Limite de Placas
+        status_placas = str(num_placas)
+        if num_placas > f["Limite"]:
+            status_placas = f"⚠ {num_placas} (Excede {f['Limite']})"
+            
         selecao_final.append({
-            "Equipamento": f["Modelo"], "Qtd Placas": int(num_placas),
-            "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)
+            "Equipamento": f["Modelo"], 
+            "Qtd Placas": status_placas,
+            "Área Total (m²)": round(area_total, 2), 
+            "Taxa (kg/m².h)": round(taxa_filt, 2)
         })
 
-    # --- PDF ---
-    df_results = pd.DataFrame(selecao_final)
+    st.table(pd.DataFrame(selecao_final))
+
+    # --- REGRAS DE STATUS TÉCNICO ---
+    # Usando o modelo 1200mm como referência para o farol, se válido
     try:
-        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
-        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+        taxa_ref = (prod_seca_hora * 1000) / (mapa_filtros[4]["Area_Placa"] * math.ceil((vol_torta_ciclo_m3 * 1000) / mapa_filtros[4]["Vol_Placa"])) if prod_seca_hora > 0 else 0
+        if taxa_ref > 450:
+            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa excedida em modelos de médio porte!")
+        elif taxa_ref > 300:
+            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Operação em zona de alta pressão.")
+        elif taxa_ref > 0:
+            st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos equilibrados.")
     except:
         pass
 
-    tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
+    tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
+    st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
 
-    with tab1:
-        st.write("### Dimensionamento de equipamento")
-        st.table(df_results)
-        
-        taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] if len(selecao_final) > 2 else 0
-        if taxa_ref > 450:
-            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_ref} kg/m².h excede o limite técnico!")
-        elif taxa_ref > 300:
-            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_ref} kg/m².h em zona de alerta.")
-        else:
-            st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_ref} kg/m².h ideal.")
+    # --- GRÁFICO E OPEX ---
+    col_perf, col_opex = st.columns(2)
+    with col_perf:
+        st.subheader("📈 Performance Dinâmica Estimada")
+        t = np.linspace(1, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 50)
+        v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 2)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(50)
+        fig_perf, ax_perf = plt.subplots()
+        ax_perf.plot(t, v_acumulado, color='#003366', linewidth=2)
+        ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
+        st.pyplot(fig_perf)
 
-        tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
-
-    with tab2:
-        col_perf, col_opex = st.columns(2)
-        with col_perf:
-            st.subheader("📈 Performance Dinâmica Estimada")
-            t = np.linspace(1, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 50)
-            v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 2)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(50)
-            fig_perf, ax_perf = plt.subplots()
-            ax_perf.plot(t, v_acumulado, color='#003366', linewidth=2)
-            ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
-            st.pyplot(fig_perf)
-
-        with col_opex:
-            st.subheader("Custos e Ciclos")
-            st.write(f"**Disponibilidade Calculada:** {disponibilidade_h:.2f} h/dia")
-            st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
-            st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
-            fig2, ax2 = plt.subplots(figsize=(4, 4))
-            ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
-            st.pyplot(fig2)
+    with col_opex:
+        st.subheader("Custos e Ciclos")
+        st.write(f"**Disponibilidade Calculada:** {disponibilidade_h:.2f} h/dia")
+        st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
+        st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
+        fig2, ax2 = plt.subplots(figsize=(4, 4))
+        ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
+        st.pyplot(fig2)
 
 if __name__ == "__main__":
     main()
