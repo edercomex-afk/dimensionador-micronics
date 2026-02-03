@@ -16,11 +16,11 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
     pdf.cell(190, 10, "CLEANOVA MICRONICS - MEMORIAL DE CALCULO", ln=True, align="C")
     pdf.set_font("Arial", "", 12)
     pdf.ln(10)
-    pdf.cell(190, 10, f"Empresa: {empresa}")
+    pdf.cell(190, 10, f"Empresa: {empresa if empresa else '---'}")
     pdf.ln(7)
-    pdf.cell(190, 10, f"Projeto: {projeto} | OPP: {opp}", ln=True)
-    pdf.cell(190, 10, f"Responsavel: {responsavel}", ln=True)
-    pdf.cell(190, 10, f"Localidade: {cidade}/{estado}", ln=True)
+    pdf.cell(190, 10, f"Projeto: {projeto if projeto else '---'} | OPP: {opp if opp else '---'}", ln=True)
+    pdf.cell(190, 10, f"Responsavel: {responsavel if responsavel else '---'}", ln=True)
+    pdf.cell(190, 10, f"Localidade: {cidade if cidade else '---'}/{estado}", ln=True)
     pdf.ln(5)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 10, "RESUMO OPERACIONAL", ln=True)
@@ -46,61 +46,49 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SIDEBAR COMPLETA RESTAURADA ---
+    # --- SIDEBAR COMPLETA ---
     st.sidebar.header("📋 Identificação do Projeto")
-    empresa = st.sidebar.text_input("**Empresa**", value="")
-    nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
-    num_opp = st.sidebar.text_input("**N° de OPP**", value="")
-    
-    mercados = sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"])
-    mercado_sel = st.sidebar.selectbox("**Mercado**", mercados)
-    
-    produtos = sorted(["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Ferro", "Efluente Industrial", "Lodo Biológico", "Concentrado de Grafite", "Rejeito de Grafite", "Terras Raras", "Outros"])
-    produto_sel = st.sidebar.selectbox("**Produto**", produtos)
-    
-    responsavel = st.sidebar.text_input("**Responsável pelo Projeto**", value="")
+    empresa = st.sidebar.text_input("**Empresa**")
+    nome_projeto = st.sidebar.text_input("**Nome do Projeto**")
+    num_opp = st.sidebar.text_input("**N° de OPP**")
+    mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
+    produto_sel = st.sidebar.selectbox("**Produto**", sorted(["Concentrado de Cobre", "Rejeito de Cobre", "Concentrado de Ferro", "Efluente Industrial", "Lodo Biológico", "Concentrado de Grafite", "Rejeito de Grafite", "Terras Raras", "Outros"]))
+    responsavel = st.sidebar.text_input("**Responsável pelo Projeto**")
     
     col_cid, col_est = st.sidebar.columns(2)
-    cidade = col_cid.text_input("**Cidade**", value="")
+    cidade = col_cid.text_input("**Cidade**")
     estados_br = sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"])
-    estado = col_est.selectbox("**Estado**", estados_br, index=estados_br.index("SP"))
+    estado = col_est.selectbox("**Estado**", estados_br, index=24)
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
     prod_seca_dia = st.sidebar.number_input("**Peso total dos Sólidos (T/Dia)**", value=0.0)
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 1, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
-    
-    # Automação da Massa Seca horária exposta na sidebar
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
     st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
     
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
-
+    
     st.sidebar.divider()
     st.sidebar.header("🧬 **Densidade e Geometria**")
-    sg_solido = st.sidebar.number_input("**SG Sólido (g/cm³)**", value=2.70, format="%.2f")
-    espessura_camara = st.sidebar.number_input("**Espessura da Câmara (mm)**", value=40, step=1)
+    sg_solido = st.sidebar.number_input("**SG Sólido (g/cm³)**", value=2.70)
+    espessura_camara = st.sidebar.number_input("**Espessura da Câmara (mm)**", value=40)
     
     st.sidebar.divider()
     st.sidebar.header("🔄 **Ciclos e Operação**")
-    vida_util_lona = st.sidebar.number_input("**Vida Útil da Lona (Ciclos)**", value=2000)
     tempo_ciclo_min = st.sidebar.number_input("**Tempo de Ciclo (min)**", value=60)
-    custo_kwh_hora = st.sidebar.number_input("**Custo do KWH por hora (R$/h)**", value=0.0)
     pressao_operacao = st.sidebar.slider("**Pressão de Filtração (Bar)**", 1, 15, 6)
 
-    # --- NÚCLEO DE CÁLCULO ---
+    # --- CÁLCULOS ---
     try:
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 0
-        massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
-        taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo if sg_lodo > 0 else 0
+        taxa_fluxo_lodo_m3h = (prod_seca_hora / (conc_solidos / 100)) / sg_lodo if sg_lodo > 0 else 0
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
-        ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
-        
-        massa_torta_ciclo = (prod_seca_hora * (tempo_ciclo_min / 60)) / (1 - (umidade_torta / 100))
+        massa_torta_ciclo = (prod_seca_hora * (tempo_ciclo_min / 60)) / (1 - (umidade_torta / 100)) if umidade_torta < 100 else 0
         vol_torta_ciclo_m3 = massa_torta_ciclo / 1.8 
     except:
         sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = 0.0
@@ -136,7 +124,6 @@ def main():
         
         excede = num_placas > f["Limite"]
         item = {"Equipamento": f["Modelo"], "Qtd Placas": str(num_placas) if not excede else f"⚠ {num_placas} (Excede {f['Limite']})", "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)}
-
         if not excede:
             lista_exibicao.append(item)
         elif not primeira_fora:
@@ -144,9 +131,10 @@ def main():
             primeira_fora = True
             break
 
-    st.table(pd.DataFrame(lista_exibicao))
+    df_selecao = pd.DataFrame(lista_exibicao)
+    st.table(df_selecao)
 
-    # --- GRÁFICO DUAS LINHAS ---
+    # --- GRÁFICO ---
     st.divider()
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
@@ -154,7 +142,6 @@ def main():
         t = np.linspace(0, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 100)
         v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
         v_setpoint = np.full(100, vol_torta_ciclo_m3) if vol_torta_ciclo_m3 > 0 else np.zeros(100)
-        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.plot(t, v_acumulado, label="Volume Filtrado Acumulado", color="#003366", linewidth=2.5)
         ax.plot(t, v_setpoint, label="Capacidade Máxima da Câmara", color="#FF0000", linestyle="--", linewidth=2)
@@ -163,16 +150,17 @@ def main():
 
     with col_stats:
         st.subheader("⚙️ Status")
-        st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba:** {tipo_bomba}")
         st.info(f"**Pressão:** {pressao_operacao} Bar")
 
-    # PDF
+    # --- BOTÃO DE PDF (RESTAURADO) ---
+    st.sidebar.divider()
     try:
-        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, pd.DataFrame(lista_exibicao), vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
-        st.sidebar.download_button(label="📥 Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
-    except: pass
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+    except Exception as e:
+        st.sidebar.error("Preencha os dados básicos para habilitar o PDF.")
 
 if __name__ == "__main__":
     main()
