@@ -69,13 +69,14 @@ def main():
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
-    prod_seca_dia = st.sidebar.number_input("**Massa Seca (t/Dia)**", value=0.0)
+    # TÍTULO ALTERADO CONFORME SOLICITAÇÃO
+    prod_seca_dia = st.sidebar.number_input("**Peso total dos Sólidos (T/Dia)**", value=0.0)
     prod_seca_hora = st.sidebar.number_input("**Massa Seca (t/h)**", value=0.0)
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 0, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
-    umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0) # CAMPO RECUPERADO
+    umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
     
     st.sidebar.divider()
     st.sidebar.header("🧬 **Densidade e Geometria**")
@@ -99,9 +100,8 @@ def main():
         ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
         custo_energia_diario = disponibilidade_h * custo_kwh_hora
         
-        # Cálculo de Volume de Torta por ciclo considerando a umidade
         massa_torta_ciclo = (prod_seca_hora * (tempo_ciclo_min / 60)) / (1 - (umidade_torta / 100))
-        vol_torta_ciclo_m3 = massa_torta_ciclo / 1.8 # Densidade aparente média da torta
+        vol_torta_ciclo_m3 = massa_torta_ciclo / 1.8 
     except:
         sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = 0.0
 
@@ -130,26 +130,22 @@ def main():
     ]
 
     lista_exibicao = []
-    
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        
         if num_placas <= f["Limite"]:
             area_total = num_placas * f["Area_Placa"]
             taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
-            
-            item = {
+            lista_exibicao.append({
                 "Equipamento": f["Modelo"], 
                 "Qtd Placas": int(num_placas),
                 "Área Total (m²)": round(area_total, 2), 
                 "Taxa (kg/m².h)": round(taxa_filt, 2)
-            }
-            lista_exibicao.append(item)
+            })
 
     df_selecao = pd.DataFrame(lista_exibicao) if lista_exibicao else pd.DataFrame()
     st.table(df_selecao)
 
-    # --- REGRAS DE STATUS TÉCNICO ---
+    # --- STATUS TÉCNICO ---
     try:
         if not df_selecao.empty:
             taxa_ref = lista_exibicao[-1]["Taxa (kg/m².h)"]
