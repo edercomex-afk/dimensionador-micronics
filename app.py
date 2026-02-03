@@ -8,7 +8,7 @@ from fpdf import FPDF
 # 1. Configuração de Página
 st.set_page_config(page_title="Dimensionador Micronics V53", layout="wide")
 
-# Função para Gerar PDF (Lógica de Exportação)
+# Função para Gerar PDF
 def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
     pdf = FPDF()
     pdf.add_page()
@@ -37,7 +37,7 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
     return pdf.output(dest="S").encode("latin-1")
 
 def main():
-    # Cabeçalho Técnico (Banner Azul)
+    # Cabeçalho Técnico
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
@@ -49,24 +49,28 @@ def main():
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
-    # Adicionada lista de produtos para a caixa de seleção
-    produtos = ["Concentrado de Cobre", "Concentrado de Ferro", "Rejeito", "Efluente Industrial", "Lodo Biológico", "Outros"]
+    
+    # Lista de Produtos Atualizada
+    produtos = [
+        "Concentrado de Cobre", "Rejeito de Cobre", 
+        "Concentrado de Grafite", "Rejeito de Grafite",
+        "Concentrado de Terras Raras", "Rejeito de Terras Raras",
+        "Concentrado de Ferro", "Rejeito de Ferro",
+        "Efluente Industrial", "Lodo Biológico", "Outros"
+    ]
 
-    # --- SIDEBAR ---
+    # --- SIDEBAR (IDENTIFICAÇÃO COM TÍTULOS EM NEGRITO E CAMPOS VAZIOS) ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
     num_opp = st.sidebar.text_input("**N° de OPP**", value="")
-    
     mercado_sel = st.sidebar.selectbox("**Mercado**", mercados)
-    # Box Produto restaurado como caixa de seleção
     produto_sel = st.sidebar.selectbox("**Produto**", produtos)
-    
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**", value="")
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**", value="")
-    estado = col_est.selectbox("**Estado**", estados_br, index=24)
+    estado = col_est.selectbox("**Estado**", estados_br, index=24) # SP Padrão
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
@@ -137,7 +141,7 @@ def main():
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
         st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
     except:
-        st.sidebar.warning("Preencha os dados para habilitar o PDF.")
+        pass
 
     # --- LAYOUT DE ABAS ---
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
@@ -146,14 +150,14 @@ def main():
         st.write("### Dimensionamento de Ativos")
         st.table(df_results)
         
-        # --- REGRAS DE STATUS TÉCNICO ---
-        taxa_referencia = selecao_final[2]["Taxa (kg/m².h)"] 
-        if taxa_referencia > 450:
-            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {taxa_referencia} kg/m².h excede o limite técnico!")
-        elif taxa_referencia > 300:
-            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {taxa_referencia} kg/m².h em zona de alerta.")
-        else:
-            st.success(f"✅ **STATUS NORMAL:** Taxa de {taxa_referencia} kg/m².h ideal.")
+        # REGRAS DE STATUS TÉCNICO
+        taxa_ref = selecao_final[2]["Taxa (kg/m².h)"] 
+        if taxa_ref > 450:
+            st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de {tax_ref} kg/m².h excede o limite técnico!")
+        elif taxa_ref > 300:
+            st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa de {tax_ref} kg/m².h em zona de alerta.")
+        elif taxa_ref > 0:
+            st.success(f"✅ **STATUS NORMAL:** Taxa de {tax_ref} kg/m².h ideal.")
 
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
@@ -168,10 +172,14 @@ def main():
                 fig_perf, ax_perf = plt.subplots()
                 ax_perf.plot(t, v_acumulado, color='#003366', linewidth=2)
                 ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
+                ax_perf.grid(True, alpha=0.3)
                 st.pyplot(fig_perf)
+            else:
+                st.write("Insira os parâmetros de processo para visualizar a performance.")
+
         with col_opex:
             st.subheader("Custos e Ciclos")
-            st.write(f"**Produto Selecionado:** {produto_sel}")
+            st.write(f"**Responsável:** {responsavel if responsavel else '---'}")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
