@@ -131,7 +131,6 @@ def main():
     ]
 
     lista_exibicao = []
-    # ALTERAÇÃO: Itera por toda a lista e seleciona apenas as 3 primeiras entradas que possuem cálculo
     contador = 0
     for f in mapa_filtros:
         if contador < 3:
@@ -139,22 +138,27 @@ def main():
             if num_placas > 0:
                 area_total = num_placas * f["Area_Placa"]
                 taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
-                
                 excede = num_placas > f["Limite"]
                 qtd_display = f"⚠ {num_placas} (Excede {f['Limite']})" if excede else int(num_placas)
-                
-                lista_exibicao.append({
-                    "Equipamento": f["Modelo"], 
-                    "Qtd Placas": qtd_display, 
-                    "Área Total (m²)": round(area_total, 2), 
-                    "Taxa (kg/m².h)": round(taxa_filt, 2)
-                })
+                lista_exibicao.append({"Equipamento": f["Modelo"], "Qtd Placas": qtd_display, "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)})
                 contador += 1
 
     df_selecao = pd.DataFrame(lista_exibicao)
     st.table(df_selecao)
 
-    # --- GRÁFICO ---
+    # --- FAROL DE STATUS TÉCNICO (RESTAURADO) ---
+    try:
+        if not df_selecao.empty:
+            taxa_ref = lista_exibicao[-1]["Taxa (kg/m².h)"]
+            if taxa_ref > 450:
+                st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
+            elif taxa_ref > 300:
+                st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite de pressão.")
+            elif taxa_ref > 0:
+                st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
+    except: pass
+
+    # --- GRÁFICO E OPEX ---
     st.divider()
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
@@ -172,11 +176,9 @@ def main():
         st.subheader("⚙️ Custos e Ciclos")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
-        
         fig2, ax2 = plt.subplots(figsize=(4, 4))
         ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
         st.pyplot(fig2)
-        
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
         st.info(f"**Pressão:** {pressao_operacao} Bar")
