@@ -69,12 +69,19 @@ def main():
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
-    # TÍTULO ALTERADO CONFORME SOLICITAÇÃO
+    
+    # Input Principal
     prod_seca_dia = st.sidebar.number_input("**Peso total dos Sólidos (T/Dia)**", value=0.0)
-    prod_seca_hora = st.sidebar.number_input("**Massa Seca (t/h)**", value=0.0)
-    vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
-    disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 0, 100, 85)
+    
+    # Disponibilidade em Porcentagem
+    disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 1, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
+    
+    # CÁLCULO AUTOMÁTICO DA MASSA SECA HORÁRIA
+    prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
+    st.sidebar.write(f"⚖️ **Massa Seca (t/h) calculada:** {prod_seca_hora:.3f}")
+    
+    vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
     
@@ -175,6 +182,7 @@ def main():
     with col_opex:
         st.subheader("Custos e Ciclos")
         st.write(f"**Umidade Alvo:** {umidade_torta}%")
+        st.write(f"**Horas de Operação:** {disponibilidade_h:.2f} h/dia")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
         fig2, ax2 = plt.subplots(figsize=(4, 4))
