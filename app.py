@@ -79,19 +79,25 @@ def main():
     
     st.sidebar.divider()
     st.sidebar.header("🔄 **Ciclos e Operação**")
+    vida_util_lona = st.sidebar.number_input("**Vida Útil da Lona (Ciclos)**", value=2000)
     tempo_ciclo_min = st.sidebar.number_input("**Tempo de Ciclo (min)**", value=60)
+    custo_kwh_hora = st.sidebar.number_input("**Custo do KWH por hora (R$/h)**", value=0.0)
     pressao_operacao = st.sidebar.slider("**Pressão de Filtração (Bar)**", 1, 15, 6)
 
     # --- CÁLCULOS ---
     try:
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 0
-        taxa_fluxo_lodo_m3h = (prod_seca_hora / (conc_solidos / 100)) / sg_lodo if sg_lodo > 0 else 0
+        massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
+        taxa_fluxo_lodo_m3h = (massa_polpa_hora / sg_lodo) if sg_lodo > 0 else 0
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
+        ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
+        custo_energia_diario = disponibilidade_h * custo_kwh_hora
+        
         massa_torta_ciclo = (prod_seca_hora * (tempo_ciclo_min / 60)) / (1 - (umidade_torta / 100)) if umidade_torta < 100 else 0
         vol_torta_ciclo_m3 = massa_torta_ciclo / 1.8 
     except:
-        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = 0.0
+        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = ciclos_dia = custo_energia_diario = 0.0
 
     # --- PAINEL PRINCIPAL ---
     st.write(f"### 🚀 Resumo Operacional")
@@ -131,10 +137,9 @@ def main():
             primeira_fora = True
             break
 
-    df_selecao = pd.DataFrame(lista_exibicao)
-    st.table(df_selecao)
+    st.table(pd.DataFrame(lista_exibicao))
 
-    # --- GRÁFICO ---
+    # --- GRÁFICO E OPEX ---
     st.divider()
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
@@ -149,18 +154,25 @@ def main():
         st.pyplot(fig)
 
     with col_stats:
-        st.subheader("⚙️ Status")
+        st.subheader("⚙️ Custos e Ciclos")
+        st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
+        st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
+        
+        # Gráfico de OPEX (Pizza)
+        fig2, ax2 = plt.subplots(figsize=(4, 4))
+        ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
+        st.pyplot(fig2)
+        
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.success(f"**Bomba:** {tipo_bomba}")
+        st.success(f"**Bomba Sugerida:** {tipo_bomba}")
         st.info(f"**Pressão:** {pressao_operacao} Bar")
 
-    # --- BOTÃO DE PDF (RESTAURADO) ---
+    # Botão de PDF na Sidebar
     st.sidebar.divider()
     try:
-        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, pd.DataFrame(lista_exibicao), vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
         st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
-    except Exception as e:
-        st.sidebar.error("Preencha os dados básicos para habilitar o PDF.")
+    except: pass
 
 if __name__ == "__main__":
     main()
