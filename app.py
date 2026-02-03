@@ -53,20 +53,10 @@ def main():
     num_opp = st.sidebar.text_input("**N° de OPP**")
     mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
     
-    # LISTA DE PRODUTOS RESTAURADA E ATUALIZADA EM ORDEM ALFABÉTICA
     produtos = sorted([
-        "Concentrado de Cobre", 
-        "Concentrado de Ferro", 
-        "Concentrado de Grafite", 
-        "Concentrado de Ouro", 
-        "Concentrado de Terras Raras",
-        "Efluente Industrial", 
-        "Lodo Biológico", 
-        "Rejeito de Cobre", 
-        "Rejeito de Ferro", 
-        "Rejeito de Grafite", 
-        "Rejeito de Terras Raras",
-        "Outros"
+        "Concentrado de Cobre", "Concentrado de Ferro", "Concentrado de Grafite", "Concentrado de Ouro", 
+        "Concentrado de Terras Raras", "Efluente Industrial", "Lodo Biológico", "Rejeito de Cobre", 
+        "Rejeito de Ferro", "Rejeito de Grafite", "Rejeito de Terras Raras", "Outros"
     ])
     produto_sel = st.sidebar.selectbox("**Produto**", produtos)
     
@@ -127,6 +117,7 @@ def main():
 
     st.divider()
 
+    # --- TABELA DE DIMENSIONAMENTO (LIMITADA ÀS 3 PRIMEIRAS OPÇÕES) ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
@@ -140,12 +131,25 @@ def main():
     ]
 
     lista_exibicao = []
+    # ALTERAÇÃO: Itera por toda a lista e seleciona apenas as 3 primeiras entradas que possuem cálculo
+    contador = 0
     for f in mapa_filtros:
-        num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        if num_placas <= f["Limite"] and num_placas > 0:
-            area_total = num_placas * f["Area_Placa"]
-            taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
-            lista_exibicao.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)})
+        if contador < 3:
+            num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
+            if num_placas > 0:
+                area_total = num_placas * f["Area_Placa"]
+                taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
+                
+                excede = num_placas > f["Limite"]
+                qtd_display = f"⚠ {num_placas} (Excede {f['Limite']})" if excede else int(num_placas)
+                
+                lista_exibicao.append({
+                    "Equipamento": f["Modelo"], 
+                    "Qtd Placas": qtd_display, 
+                    "Área Total (m²)": round(area_total, 2), 
+                    "Taxa (kg/m².h)": round(taxa_filt, 2)
+                })
+                contador += 1
 
     df_selecao = pd.DataFrame(lista_exibicao)
     st.table(df_selecao)
