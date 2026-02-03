@@ -65,10 +65,10 @@ def main():
     prod_seca_dia = st.sidebar.number_input("**Peso total dos Sólidos (T/Dia)**", value=0.0)
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 1, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
+    
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
     st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
     
-    vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
     
@@ -109,6 +109,7 @@ def main():
 
     st.divider()
 
+    # --- TABELA DE DIMENSIONAMENTO (REGRA: APENAS DENTRO DO LIMITE) ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
@@ -122,22 +123,21 @@ def main():
     ]
 
     lista_exibicao = []
-    primeira_fora = False
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        area_total = num_placas * f["Area_Placa"]
-        taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
-        
-        excede = num_placas > f["Limite"]
-        item = {"Equipamento": f["Modelo"], "Qtd Placas": str(num_placas) if not excede else f"⚠ {num_placas} (Excede {f['Limite']})", "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)}
-        if not excede:
-            lista_exibicao.append(item)
-        elif not primeira_fora:
-            lista_exibicao.append(item)
-            primeira_fora = True
-            break
+        # FILTRO RÍGIDO: Somente se estiver dentro do limite
+        if num_placas <= f["Limite"] and num_placas > 0:
+            area_total = num_placas * f["Area_Placa"]
+            taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
+            lista_exibicao.append({
+                "Equipamento": f["Modelo"], 
+                "Qtd Placas": int(num_placas), 
+                "Área Total (m²)": round(area_total, 2), 
+                "Taxa (kg/m².h)": round(taxa_filt, 2)
+            })
 
-    st.table(pd.DataFrame(lista_exibicao))
+    df_selecao = pd.DataFrame(lista_exibicao)
+    st.table(df_selecao)
 
     # --- GRÁFICO E OPEX ---
     st.divider()
@@ -158,7 +158,6 @@ def main():
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
         
-        # Gráfico de OPEX (Pizza)
         fig2, ax2 = plt.subplots(figsize=(4, 4))
         ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
         st.pyplot(fig2)
@@ -167,10 +166,10 @@ def main():
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
         st.info(f"**Pressão:** {pressao_operacao} Bar")
 
-    # Botão de PDF na Sidebar
+    # Botão de PDF
     st.sidebar.divider()
     try:
-        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, pd.DataFrame(lista_exibicao), vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
         st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
     except: pass
 
