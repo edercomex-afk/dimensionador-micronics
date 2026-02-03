@@ -3,9 +3,39 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import math
 import numpy as np
+from fpdf import FPDF
+import base64
 
 # 1. Configuração de Página
 st.set_page_config(page_title="Dimensionador Micronics V53", layout="wide")
+
+# Função para Gerar PDF (Lógica de Exportação)
+def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(190, 10, "CLEANOVA MICRONICS - MEMORIAL DE CALCULO", ln=True, align="C")
+    pdf.set_font("Arial", "", 12)
+    pdf.ln(10)
+    pdf.cell(190, 10, f"Empresa: {empresa}", ln=True)
+    pdf.cell(190, 10, f"Projeto: {projeto} | OPP: {opp}", ln=True)
+    pdf.cell(190, 10, f"Responsavel: {responsavel}", ln=True)
+    pdf.cell(190, 10, f"Localidade: {cidade}/{estado}", ln=True)
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 10, "RESUMO OPERACIONAL", ln=True)
+    pdf.set_font("Arial", "", 11)
+    pdf.cell(190, 8, f"- Volume de Lodo/Dia: {vol_dia:.2f} m3/dia", ln=True)
+    pdf.cell(190, 8, f"- Taxa de Fluxo: {fluxo_h:.2f} m3/h", ln=True)
+    pdf.cell(190, 8, f"- Vazao de Pico: {pico:,.0f} L/h", ln=True)
+    pdf.cell(190, 8, f"- Grav. Especifica: {sg:.3f}", ln=True)
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 10, "TABELA DE SELECAO", ln=True)
+    pdf.set_font("Arial", "", 10)
+    for index, row in resultados_df.iterrows():
+        pdf.cell(190, 8, f"{row['Equipamento']} | Placas: {row['Qtd Placas']} | Area: {row['Área Total (m²)']} m2 | Taxa: {row['Taxa (kg/m².h)']}", ln=True)
+    return pdf.output(dest="S").encode("latin-1")
 
 def main():
     # Cabeçalho Técnico (Banner Azul)
@@ -19,21 +49,19 @@ def main():
     # Listas de Seleção
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
-    
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
 
-    # --- SIDEBAR (IDENTIFICAÇÃO COM TÍTULOS EM NEGRITO E CAMPOS VAZIOS) ---
+    # --- SIDEBAR ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**", value="")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**", value="")
     num_opp = st.sidebar.text_input("**N° de OPP**", value="")
-    
     mercado_sel = st.sidebar.selectbox("**Mercado**", mercados)
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**", value="")
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**", value="")
-    estado = col_est.selectbox("**Estado**", estados_br, index=24) # SP Padrão
+    estado = col_est.selectbox("**Estado**", estados_br, index=24)
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
@@ -94,25 +122,26 @@ def main():
         area_total = num_placas * f["Area_Placa"]
         taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
         selecao_final.append({
-            "Equipamento": f["Modelo"],
-            "Qtd Placas": int(num_placas),
-            "Área Total (m²)": round(area_total, 2),
-            "Taxa (kg/m².h)": round(taxa_filt, 2)
+            "Equipamento": f["Modelo"], "Qtd Placas": int(num_placas),
+            "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)
         })
+
+    # --- BOTÃO DE PDF ---
+    df_results = pd.DataFrame(selecao_final)
+    pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+    st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
 
     # --- LAYOUT DE ABAS ---
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
 
     with tab1:
         st.write("### Dimensionamento de Ativos")
-        st.table(pd.DataFrame(selecao_final))
-        # Atualizado para "Bomba Sugerida"
+        st.table(df_results)
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
 
     with tab2:
         col_perf, col_opex = st.columns(2)
-        
         with col_perf:
             st.subheader("📈 Performance Dinâmica Estimada")
             if taxa_fluxo_lodo_m3h > 0:
@@ -120,16 +149,10 @@ def main():
                 v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 2)) 
                 fig_perf, ax_perf = plt.subplots()
                 ax_perf.plot(t, v_acumulado, color='#003366', linewidth=2)
-                ax_perf.set_xlabel("Tempo de Ciclo (min)")
-                ax_perf.set_ylabel("Volume Acumulado (m³)")
-                ax_perf.grid(True, alpha=0.3)
+                ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
                 st.pyplot(fig_perf)
-            else:
-                st.write("Insira os parâmetros de processo para visualizar a performance.")
-
         with col_opex:
             st.subheader("Custos e Ciclos")
-            st.write(f"**Responsável:** {responsavel if responsavel else '---'}")
             st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
             st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
