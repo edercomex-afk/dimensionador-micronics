@@ -51,9 +51,13 @@ def main():
     empresa = st.sidebar.text_input("**Empresa**")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**")
     num_opp = st.sidebar.text_input("**N° de OPP**")
-    
     mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
-    produtos = sorted(["Concentrado de Cobre", "Concentrado de Ferro", "Concentrado de Grafite", "Concentrado de Ouro", "Concentrado de Terras Raras", "Efluente Industrial", "Lodo Biológico", "Rejeito de Cobre", "Rejeito de Ferro", "Rejeito de Grafite", "Rejeito de Terras Raras", "Outros"])
+    
+    produtos = sorted([
+        "Concentrado de Cobre", "Concentrado de Ferro", "Concentrado de Grafite", "Concentrado de Ouro", 
+        "Concentrado de Terras Raras", "Efluente Industrial", "Lodo Biológico", "Rejeito de Cobre", 
+        "Rejeito de Ferro", "Rejeito de Grafite", "Rejeito de Terras Raras", "Outros"
+    ])
     produto_sel = st.sidebar.selectbox("**Produto**", produtos)
     
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**")
@@ -70,7 +74,7 @@ def main():
     disponibilidade_h = (disponibilidade_perc / 100) * 24
     
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
-    st.sidebar.info(f"⚖️ **Massa Seca (t/h) calculada:** {prod_seca_hora:.3f}")
+    st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
     
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
@@ -113,6 +117,7 @@ def main():
 
     st.divider()
 
+    # --- TABELA DE DIMENSIONAMENTO (FILTRAGEM POR LIMITE DE PLACAS) ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80, "Preco_Lona": 150},
@@ -131,12 +136,12 @@ def main():
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         
-        # REGRA DE FILTRAGEM: Somente o que estiver dentro do limite
+        # REGRA: Só exibe se estiver dentro do limite técnico do modelo
         if 0 < num_placas <= f["Limite"]:
             area_total = num_placas * f["Area_Placa"]
             taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
             
-            # Rateio OPEX (baseado no primeiro modelo válido encontrado)
+            # Cálculo do OPEX Lonas para o primeiro modelo válido (ou o selecionado)
             if not lista_exibicao:
                 valor_jogo = num_placas * f["Preco_Lona"]
                 dias_duracao = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 1
@@ -152,13 +157,13 @@ def main():
     df_selecao = pd.DataFrame(lista_exibicao)
     if not df_selecao.empty:
         st.table(df_selecao)
-        # Farol de Alerta
+        # Farol de Alerta baseado no primeiro equipamento sugerido
         taxa_ref = lista_exibicao[0]["Taxa (kg/m².h)"]
         if taxa_ref > 450: st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
-        elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite.")
+        elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite de pressão.")
         elif taxa_ref > 0: st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
     else:
-        st.warning("Nenhum equipamento individual atende a essa carga dentro dos limites de placas. Considere dividir a vazão entre duas ou mais unidades.")
+        st.warning("Nenhum modelo individual atende aos requisitos dentro do limite de placas. Verifique os parâmetros ou considere múltiplas unidades.")
 
     st.divider()
     
@@ -169,7 +174,6 @@ def main():
         t = np.linspace(0, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 100)
         v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
         v_setpoint = np.full(100, vol_torta_ciclo_m3) if vol_torta_ciclo_m3 > 0 else np.zeros(100)
-        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.plot(t, v_acumulado, label="Volume Filtrado Acumulado", color="#003366", linewidth=2.5)
         ax.plot(t, v_setpoint, label="Capacidade Máxima da Câmara", color="#FF0000", linestyle="--", linewidth=2)
@@ -180,17 +184,18 @@ def main():
         st.subheader("⚙️ Custos e Ciclos (OPEX)")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         dias_vida = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 0
-        st.write(f"**Duração das Lonas:** {dias_vida:.1f} dias")
+        st.write(f"**Duração Estimada das Lonas:** {dias_vida:.1f} dias")
         st.write(f"---")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energy_dia:.2f}")
         custo_manut = custo_energy_dia * 0.20
-        st.write(f"**Rateio Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
-        st.write(f"**Est. Manutenção/Dia:** R$ {custo_manut:.2f}")
+        st.write(f"**Rateio Troca de Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
+        st.write(f"**Est. Manutenção Geral/Dia:** R$ {custo_manut:.2f}")
         st.write(f"---")
-        st.write(f"**OPEX Total/Dia:** R$ {(custo_energy_dia + custo_lonas_dia + custo_manut):.2f}")
+        st.write(f"**OPEX Total Estimado/Dia:** R$ {(custo_energy_dia + custo_lonas_dia + custo_manut):.2f}")
         
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
+        st.info(f"**Pressão:** {pressao_operacao} Bar")
 
     # Botão de PDF
     st.sidebar.divider()
