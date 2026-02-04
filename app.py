@@ -119,18 +119,20 @@ def main():
 
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
-        {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
-        {"Modelo": "630mm", "Vol_Placa": 11.5, "Area_Placa": 0.70, "Limite": 90},
-        {"Modelo": "800mm", "Vol_Placa": 15.0, "Area_Placa": 1.10, "Limite": 100},
-        {"Modelo": "1000mm", "Vol_Placa": 25.0, "Area_Placa": 1.80, "Limite": 100},
-        {"Modelo": "1200mm", "Vol_Placa": 45.0, "Area_Placa": 2.60, "Limite": 100},
-        {"Modelo": "1500mm", "Vol_Placa": 80.0, "Area_Placa": 4.10, "Limite": 150},
-        {"Modelo": "2000mm", "Vol_Placa": 150.0, "Area_Placa": 7.50, "Limite": 180},
-        {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180},
+        {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80, "Preco_Lona": 150},
+        {"Modelo": "630mm", "Vol_Placa": 11.5, "Area_Placa": 0.70, "Limite": 90, "Preco_Lona": 250},
+        {"Modelo": "800mm", "Vol_Placa": 15.0, "Area_Placa": 1.10, "Limite": 100, "Preco_Lona": 380},
+        {"Modelo": "1000mm", "Vol_Placa": 25.0, "Area_Placa": 1.80, "Limite": 100, "Preco_Lona": 550},
+        {"Modelo": "1200mm", "Vol_Placa": 45.0, "Area_Placa": 2.60, "Limite": 100, "Preco_Lona": 850},
+        {"Modelo": "1500mm", "Vol_Placa": 80.0, "Area_Placa": 4.10, "Limite": 150, "Preco_Lona": 1200},
+        {"Modelo": "2000mm", "Vol_Placa": 150.0, "Area_Placa": 7.50, "Limite": 180, "Preco_Lona": 2200},
+        {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180, "Preco_Lona": 3500},
     ]
 
     lista_exibicao = []
     contador = 0
+    custo_lonas_dia = 0
+    
     for f in mapa_filtros:
         if contador < 3:
             num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
@@ -139,6 +141,12 @@ def main():
                 taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
                 excede = num_placas > f["Limite"]
                 qtd_display = f"⚠ {num_placas} (Excede {f['Limite']})" if excede else int(num_placas)
+                
+                # Cálculo do Custo de Lona baseado na vida útil (apenas para o modelo selecionado/último da lista de 3)
+                valor_jogo = num_placas * f["Preco_Lona"]
+                dias_duracao = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 1
+                custo_lonas_dia = valor_jogo / dias_duracao if dias_duracao > 0 else 0
+                
                 lista_exibicao.append({"Equipamento": f["Modelo"], "Qtd Placas": qtd_display, "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)})
                 contador += 1
 
@@ -167,19 +175,22 @@ def main():
         st.pyplot(fig)
 
     with col_stats:
-        # ALTERAÇÃO: EXIBIÇÃO NUMÉRICA DO OPEX RESTAURADA
         st.subheader("⚙️ Custos e Ciclos (OPEX)")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
+        
+        # Lógica de Vida Útil em Dias
+        dias_vida = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 0
+        st.write(f"**Duração Estimada das Lonas:** {dias_vida:.1f} dias")
+        
+        st.write(f"---")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energy_dia:.2f}")
         
-        # Valores estimados de manutenção baseados no custo de energia (proporcional)
-        custo_lonas = custo_energy_dia * 0.5
-        custo_manut = custo_energy_dia * 0.25
-        
-        st.write(f"**Est. Troca de Lonas/Dia:** R$ {custo_lonas:.2f}")
+        # OPEX baseado na vida útil real inserida
+        custo_manut = custo_energy_dia * 0.20
+        st.write(f"**Rateio Troca de Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
         st.write(f"**Est. Manutenção Geral/Dia:** R$ {custo_manut:.2f}")
         st.write(f"---")
-        st.write(f"**OPEX Total Estimado/Dia:** R$ {(custo_energy_dia + custo_lonas + custo_manut):.2f}")
+        st.write(f"**OPEX Total Estimado/Dia:** R$ {(custo_energy_dia + custo_lonas_dia + custo_manut):.2f}")
         
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
