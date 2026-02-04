@@ -51,13 +51,9 @@ def main():
     empresa = st.sidebar.text_input("**Empresa**")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**")
     num_opp = st.sidebar.text_input("**N° de OPP**")
-    mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
     
-    produtos = sorted([
-        "Concentrado de Cobre", "Concentrado de Ferro", "Concentrado de Grafite", "Concentrado de Ouro", 
-        "Concentrado de Terras Raras", "Efluente Industrial", "Lodo Biológico", "Rejeito de Cobre", 
-        "Rejeito de Ferro", "Rejeito de Grafite", "Rejeito de Terras Raras", "Outros"
-    ])
+    mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
+    produtos = sorted(["Concentrado de Cobre", "Concentrado de Ferro", "Concentrado de Grafite", "Concentrado de Ouro", "Concentrado de Terras Raras", "Efluente Industrial", "Lodo Biológico", "Rejeito de Cobre", "Rejeito de Ferro", "Rejeito de Grafite", "Rejeito de Terras Raras", "Outros"])
     produto_sel = st.sidebar.selectbox("**Produto**", produtos)
     
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**")
@@ -117,7 +113,6 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80, "Preco_Lona": 150},
@@ -131,42 +126,39 @@ def main():
     ]
 
     lista_exibicao = []
-    contador = 0
     custo_lonas_dia = 0
     
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        if num_placas > 0 and contador < 3:
+        
+        # REGRA DE FILTRAGEM: Somente o que estiver dentro do limite
+        if 0 < num_placas <= f["Limite"]:
             area_total = num_placas * f["Area_Placa"]
             taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
             
-            excede = num_placas > f["Limite"]
-            qtd_display = f"⚠ {num_placas} (Excede {f['Limite']})" if excede else int(num_placas)
-            
-            # Cálculo OPEX Lonas baseado na vida útil informada
-            valor_jogo = num_placas * f["Preco_Lona"]
-            dias_duracao = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 1
-            custo_lonas_dia = valor_jogo / dias_duracao if dias_duracao > 0 else 0
+            # Rateio OPEX (baseado no primeiro modelo válido encontrado)
+            if not lista_exibicao:
+                valor_jogo = num_placas * f["Preco_Lona"]
+                dias_duracao = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 1
+                custo_lonas_dia = valor_jogo / dias_duracao if dias_duracao > 0 else 0
             
             lista_exibicao.append({
                 "Equipamento": f["Modelo"], 
-                "Qtd Placas": qtd_display, 
+                "Qtd Placas": int(num_placas), 
                 "Área Total (m²)": round(area_total, 2), 
                 "Taxa (kg/m².h)": round(taxa_filt, 2)
             })
-            contador += 1
 
     df_selecao = pd.DataFrame(lista_exibicao)
     if not df_selecao.empty:
         st.table(df_selecao)
-        
         # Farol de Alerta
-        taxa_ref = lista_exibicao[-1]["Taxa (kg/m².h)"]
+        taxa_ref = lista_exibicao[0]["Taxa (kg/m².h)"]
         if taxa_ref > 450: st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
         elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite.")
         elif taxa_ref > 0: st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
     else:
-        st.write("Aguardando parâmetros para gerar tabela...")
+        st.warning("Nenhum equipamento individual atende a essa carga dentro dos limites de placas. Considere dividir a vazão entre duas ou mais unidades.")
 
     st.divider()
     
@@ -175,7 +167,7 @@ def main():
     with col_graph:
         st.subheader("📊 Gráfico de Performance e Saturação")
         t = np.linspace(0, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 100)
-        v_acumulado = np.sqrt(t * (taxa_flow_lodo := taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
+        v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
         v_setpoint = np.full(100, vol_torta_ciclo_m3) if vol_torta_ciclo_m3 > 0 else np.zeros(100)
         
         fig, ax = plt.subplots(figsize=(8, 4))
