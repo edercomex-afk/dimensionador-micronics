@@ -4,41 +4,76 @@ import matplotlib.pyplot as plt
 import math
 import numpy as np
 from fpdf import FPDF
+import tempfile
+import os
 
 # 1. Configuração de Página
 st.set_page_config(page_title="Dimensionador Micronics V53", layout="wide")
 
-# Função para Gerar PDF
-def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
+# Função para Gerar PDF Completo (Com Gráfico e Tabela)
+def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg, fig):
     pdf = FPDF()
     pdf.add_page()
+    
+    # Cabeçalho
     pdf.set_font("Arial", "B", 16)
     pdf.cell(190, 10, "CLEANOVA MICRONICS - MEMORIAL DE CALCULO", ln=True, align="C")
     pdf.set_font("Arial", "", 12)
-    pdf.ln(10)
-    pdf.cell(190, 10, f"Empresa: {empresa if empresa else '---'}")
-    pdf.ln(7)
-    pdf.cell(190, 10, f"Projeto: {projeto if projeto else '---'} | OPP: {opp if opp else '---'}", ln=True)
-    pdf.cell(190, 10, f"Responsavel: {responsavel if responsavel else '---'}", ln=True)
-    pdf.cell(190, 10, f"Localidade: {cidade if cidade else '---'}/{estado}", ln=True)
     pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 10, "RESUMO OPERACIONAL", ln=True)
-    pdf.set_font("Arial", "", 11)
-    pdf.cell(190, 8, f"- Volume de Lodo/Dia: {vol_dia:.2f} m3/dia", ln=True)
-    pdf.cell(190, 8, f"- Taxa de Fluxo: {fluxo_h:.2f} m3/h", ln=True)
-    pdf.cell(190, 8, f"- Vazao de Pico: {pico:,.0f} L/h", ln=True)
-    pdf.cell(190, 8, f"- Grav. Especifica: {sg:.3f}", ln=True)
-    pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 10, "TABELA DE SELECAO", ln=True)
+    
+    # Dados do Projeto
+    pdf.set_fill_color(230, 230, 230)
+    pdf.cell(190, 8, f" Identificacao do Projeto", ln=True, fill=True)
     pdf.set_font("Arial", "", 10)
+    pdf.cell(95, 7, f"Empresa: {empresa if empresa else '---'}")
+    pdf.cell(95, 7, f"Responsavel: {responsavel if responsavel else '---'}", ln=True)
+    pdf.cell(95, 7, f"Projeto: {projeto if projeto else '---'}")
+    pdf.cell(95, 7, f"OPP: {opp if opp else '---'}", ln=True)
+    pdf.cell(190, 7, f"Localidade: {cidade if cidade else '---'}/{estado}", ln=True)
+    pdf.ln(5)
+
+    # Resumo Operacional
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 8, " Resumo Operacional", ln=True, fill=True)
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(95, 7, f"- Volume de Lodo/Dia: {vol_dia:.2f} m3/dia")
+    pdf.cell(95, 7, f"- Taxa de Fluxo: {fluxo_h:.2f} m3/h", ln=True)
+    pdf.cell(95, 7, f"- Vazao de Pico: {pico:,.0f} L/h")
+    pdf.cell(95, 7, f"- Grav. Especifica Polpa: {sg:.3f}", ln=True)
+    pdf.ln(5)
+
+    # Tabela de Dimensionamento
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 8, " Opcoes de Equipamento Propostas", ln=True, fill=True)
+    pdf.set_font("Arial", "B", 9)
+    # Cabeçalho da Tabela
+    pdf.cell(50, 7, "Equipamento", border=1)
+    pdf.cell(40, 7, "Qtd Placas", border=1)
+    pdf.cell(50, 7, "Area Total (m2)", border=1)
+    pdf.cell(50, 7, "Taxa (kg/m2.h)", border=1, ln=True)
+    
+    pdf.set_font("Arial", "", 9)
     for index, row in resultados_df.iterrows():
-        pdf.cell(190, 8, f"{row['Equipamento']} | Placas: {row['Qtd Placas']} | Area: {row['Área Total (m²)']} m2 | Taxa: {row['Taxa (kg/m².h)']}", ln=True)
+        pdf.cell(50, 7, str(row['Equipamento']), border=1)
+        pdf.cell(40, 7, str(row['Qtd Placas']), border=1)
+        pdf.cell(50, 7, str(row['Área Total (m²)']), border=1)
+        pdf.cell(50, 7, str(row['Taxa (kg/m².h)']), border=1, ln=True)
+    pdf.ln(10)
+
+    # Inserção do Gráfico
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 8, " Grafico de Performance e Saturacao", ln=True, fill=True)
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
+        fig.savefig(tmpfile.name, format="png", dpi=300, bbox_inches='tight')
+        pdf.image(tmpfile.name, x=15, y=pdf.get_y() + 5, w=180)
+        tmp_path = tmpfile.name
+    
+    os.remove(tmp_path)
+    
     return pdf.output(dest="S").encode("latin-1")
 
 def main():
-    # Cabeçalho Técnico
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
@@ -99,7 +134,6 @@ def main():
     except:
         sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = ciclos_dia = custo_energy_dia = 0.0
 
-    # --- PAINEL PRINCIPAL ---
     st.write(f"### 🚀 Resumo Operacional")
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.info(f"**Vol. Lodo/Dia**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
@@ -109,7 +143,6 @@ def main():
 
     st.divider()
 
-    st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80, "Preco_Lona": 150},
         {"Modelo": "630mm", "Vol_Placa": 11.5, "Area_Placa": 0.70, "Limite": 90, "Preco_Lona": 250},
@@ -121,82 +154,56 @@ def main():
         {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180, "Preco_Lona": 3500},
     ]
 
-    # --- NOVA LÓGICA DE APRESENTAÇÃO COERENTE ---
     lista_exibicao = []
-    custo_lonas_dia = 0
     idx_primeiro_valido = None
-
-    # 1. Encontrar o primeiro modelo que atende a carga
     for i, f in enumerate(mapa_filtros):
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         if 0 < num_placas <= f["Limite"]:
             idx_primeiro_valido = i
             break
 
-    # 2. Se encontrar, pegar esse e os próximos dois modelos (se existirem)
+    custo_lonas_dia = 0
     if idx_primeiro_valido is not None:
-        modelos_selecionados = mapa_filtros[idx_primeiro_valido : idx_primeiro_valido + 3]
-        
-        for i, f in enumerate(modelos_selecionados):
+        for i, f in enumerate(mapa_filtros[idx_primeiro_valido : idx_primeiro_valido + 3]):
             num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
             area_total = num_placas * f["Area_Placa"]
             taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
-            
-            # OPEX baseado no primeiro modelo da lista (o sugerido como ideal)
             if i == 0:
-                valor_jogo = num_placas * f["Preco_Lona"]
                 dias_duracao = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 1
-                custo_lonas_dia = valor_jogo / dias_duracao if dias_duracao > 0 else 0
-            
-            lista_exibicao.append({
-                "Equipamento": f["Modelo"], 
-                "Qtd Placas": int(num_placas), 
-                "Área Total (m²)": round(area_total, 2), 
-                "Taxa (kg/m².h)": round(taxa_filt, 2)
-            })
+                custo_lonas_dia = (num_placas * f["Preco_Lona"]) / dias_duracao
+            lista_exibicao.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)})
 
     df_selecao = pd.DataFrame(lista_exibicao)
     if not df_selecao.empty:
+        st.write("### Dimensionamento de equipamento")
         st.table(df_selecao)
-        taxa_ref = lista_exibicao[0]["Taxa (kg/m².h)"]
-        if taxa_ref > 450: st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
-        elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite.")
-        elif taxa_ref > 0: st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
-    else: st.warning("Carga fora de escala para equipamentos individuais ou dados insuficientes.")
 
-    st.divider()
+    # --- GERAR GRÁFICO ---
+    t = np.linspace(0, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 100)
+    v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
+    v_setpoint = np.full(100, vol_torta_ciclo_m3) if vol_torta_ciclo_m3 > 0 else np.zeros(100)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(t, v_acumulado, label="Volume Filtrado Acumulado", color="#003366", linewidth=2.5)
+    ax.plot(t, v_setpoint, label="Capacidade Máxima da Câmara", color="#FF0000", linestyle="--", linewidth=2)
+    ax.set_xlabel("Tempo de Ciclo (min)"); ax.set_ylabel("Volume (m³)"); ax.legend(); ax.grid(True, alpha=0.2)
+    
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
         st.subheader("📊 Gráfico de Performance e Saturação")
-        t = np.linspace(0, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 100)
-        v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
-        v_setpoint = np.full(100, vol_torta_ciclo_m3) if vol_torta_ciclo_m3 > 0 else np.zeros(100)
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.plot(t, v_acumulado, label="Volume Filtrado Acumulado", color="#003366", linewidth=2.5)
-        ax.plot(t, v_setpoint, label="Capacidade Máxima da Câmara", color="#FF0000", linestyle="--", linewidth=2)
-        ax.set_xlabel("Tempo de Ciclo (min)"); ax.set_ylabel("Volume (m³)"); ax.legend(); ax.grid(True, alpha=0.2)
         st.pyplot(fig)
 
     with col_stats:
         st.subheader("⚙️ Custos e Ciclos (OPEX)")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
-        dias_vida = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 0
-        st.write(f"**Duração das Lonas:** {dias_vida:.1f} dias")
-        st.write(f"---")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energy_dia:.2f}")
-        custo_manut = custo_energy_dia * 0.20
         st.write(f"**Rateio Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
-        st.write(f"**Est. Manutenção/Dia:** R$ {custo_manut:.2f}")
-        st.write(f"---")
-        st.write(f"**OPEX Total/Dia:** R$ {(custo_energy_dia + custo_lonas_dia + custo_manut):.2f}")
-        tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.success(f"**Bomba Sugerida:** {tipo_bomba}")
+        st.success(f"**Bomba Sugerida:** {'PEMO' if pressao_operacao <= 6 else 'WARMAN'}")
 
+    # Botão de PDF Corrigido
     st.sidebar.divider()
-    try:
-        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
-        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
-    except: pass
+    if not df_selecao.empty:
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo, fig)
+        st.sidebar.download_button(label="📥 Gerar Memorial em PDF", data=pdf_data, file_name=f"Memorial_Micronics_{num_opp}.pdf", mime="application/pdf")
 
 if __name__ == "__main__":
     main()
