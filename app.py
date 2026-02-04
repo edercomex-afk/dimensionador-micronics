@@ -100,12 +100,12 @@ def main():
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
         ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
-        custo_energia_diario = disponibilidade_h * custo_kwh_hora
+        custo_energy_dia = disponibilidade_h * custo_kwh_hora
         
         massa_torta_ciclo = (prod_seca_hora * (tempo_ciclo_min / 60)) / (1 - (umidade_torta / 100)) if umidade_torta < 100 else 0
         vol_torta_ciclo_m3 = massa_torta_ciclo / 1.8 
     except:
-        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = ciclos_dia = custo_energia_diario = 0.0
+        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = ciclos_dia = custo_energy_dia = 0.0
 
     # --- PAINEL PRINCIPAL ---
     st.write(f"### 🚀 Resumo Operacional")
@@ -117,7 +117,6 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO (LIMITADA ÀS 3 PRIMEIRAS OPÇÕES) ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80},
@@ -146,19 +145,14 @@ def main():
     df_selecao = pd.DataFrame(lista_exibicao)
     st.table(df_selecao)
 
-    # --- FAROL DE STATUS TÉCNICO (RESTAURADO) ---
     try:
         if not df_selecao.empty:
             taxa_ref = lista_exibicao[-1]["Taxa (kg/m².h)"]
-            if taxa_ref > 450:
-                st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
-            elif taxa_ref > 300:
-                st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite de pressão.")
-            elif taxa_ref > 0:
-                st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
+            if taxa_ref > 450: st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
+            elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite de pressão.")
+            elif taxa_ref > 0: st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
     except: pass
 
-    # --- GRÁFICO E OPEX ---
     st.divider()
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
@@ -173,17 +167,24 @@ def main():
         st.pyplot(fig)
 
     with col_stats:
-        st.subheader("⚙️ Custos e Ciclos")
+        # ALTERAÇÃO: EXIBIÇÃO NUMÉRICA DO OPEX RESTAURADA
+        st.subheader("⚙️ Custos e Ciclos (OPEX)")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
-        st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
-        fig2, ax2 = plt.subplots(figsize=(4, 4))
-        ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
-        st.pyplot(fig2)
+        st.write(f"**Custo Energia/Dia:** R$ {custo_energy_dia:.2f}")
+        
+        # Valores estimados de manutenção baseados no custo de energia (proporcional)
+        custo_lonas = custo_energy_dia * 0.5
+        custo_manut = custo_energy_dia * 0.25
+        
+        st.write(f"**Est. Troca de Lonas/Dia:** R$ {custo_lonas:.2f}")
+        st.write(f"**Est. Manutenção Geral/Dia:** R$ {custo_manut:.2f}")
+        st.write(f"---")
+        st.write(f"**OPEX Total Estimado/Dia:** R$ {(custo_energy_dia + custo_lonas + custo_manut):.2f}")
+        
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
         st.info(f"**Pressão:** {pressao_operacao} Bar")
 
-    # Botão de PDF
     st.sidebar.divider()
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
