@@ -74,7 +74,7 @@ def main():
     disponibilidade_h = (disponibilidade_perc / 100) * 24
     
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
-    st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
+    st.sidebar.info(f"⚖️ **Massa Seca (t/h) calculada:** {prod_seca_hora:.3f}")
     
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
@@ -117,6 +117,7 @@ def main():
 
     st.divider()
 
+    # --- TABELA DE DIMENSIONAMENTO ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80, "Preco_Lona": 150},
@@ -134,40 +135,49 @@ def main():
     custo_lonas_dia = 0
     
     for f in mapa_filtros:
-        if contador < 3:
-            num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-            if num_placas > 0:
-                area_total = num_placas * f["Area_Placa"]
-                taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
-                excede = num_placas > f["Limite"]
-                qtd_display = f"⚠ {num_placas} (Excede {f['Limite']})" if excede else int(num_placas)
-                
-                # Cálculo do Custo de Lona baseado na vida útil (apenas para o modelo selecionado/último da lista de 3)
-                valor_jogo = num_placas * f["Preco_Lona"]
-                dias_duracao = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 1
-                custo_lonas_dia = valor_jogo / dias_duracao if dias_duracao > 0 else 0
-                
-                lista_exibicao.append({"Equipamento": f["Modelo"], "Qtd Placas": qtd_display, "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)})
-                contador += 1
+        num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
+        if num_placas > 0 and contador < 3:
+            area_total = num_placas * f["Area_Placa"]
+            taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
+            
+            excede = num_placas > f["Limite"]
+            qtd_display = f"⚠ {num_placas} (Excede {f['Limite']})" if excede else int(num_placas)
+            
+            # Cálculo OPEX Lonas baseado na vida útil informada
+            valor_jogo = num_placas * f["Preco_Lona"]
+            dias_duracao = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 1
+            custo_lonas_dia = valor_jogo / dias_duracao if dias_duracao > 0 else 0
+            
+            lista_exibicao.append({
+                "Equipamento": f["Modelo"], 
+                "Qtd Placas": qtd_display, 
+                "Área Total (m²)": round(area_total, 2), 
+                "Taxa (kg/m².h)": round(taxa_filt, 2)
+            })
+            contador += 1
 
     df_selecao = pd.DataFrame(lista_exibicao)
-    st.table(df_selecao)
-
-    try:
-        if not df_selecao.empty:
-            taxa_ref = lista_exibicao[-1]["Taxa (kg/m².h)"]
-            if taxa_ref > 450: st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
-            elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite de pressão.")
-            elif taxa_ref > 0: st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
-    except: pass
+    if not df_selecao.empty:
+        st.table(df_selecao)
+        
+        # Farol de Alerta
+        taxa_ref = lista_exibicao[-1]["Taxa (kg/m².h)"]
+        if taxa_ref > 450: st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
+        elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite.")
+        elif taxa_ref > 0: st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
+    else:
+        st.write("Aguardando parâmetros para gerar tabela...")
 
     st.divider()
+    
+    # --- GRÁFICO E OPEX ---
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
         st.subheader("📊 Gráfico de Performance e Saturação")
         t = np.linspace(0, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 100)
-        v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
+        v_acumulado = np.sqrt(t * (taxa_flow_lodo := taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
         v_setpoint = np.full(100, vol_torta_ciclo_m3) if vol_torta_ciclo_m3 > 0 else np.zeros(100)
+        
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.plot(t, v_acumulado, label="Volume Filtrado Acumulado", color="#003366", linewidth=2.5)
         ax.plot(t, v_setpoint, label="Capacidade Máxima da Câmara", color="#FF0000", linestyle="--", linewidth=2)
@@ -177,25 +187,20 @@ def main():
     with col_stats:
         st.subheader("⚙️ Custos e Ciclos (OPEX)")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
-        
-        # Lógica de Vida Útil em Dias
         dias_vida = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 0
-        st.write(f"**Duração Estimada das Lonas:** {dias_vida:.1f} dias")
-        
+        st.write(f"**Duração das Lonas:** {dias_vida:.1f} dias")
         st.write(f"---")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energy_dia:.2f}")
-        
-        # OPEX baseado na vida útil real inserida
         custo_manut = custo_energy_dia * 0.20
-        st.write(f"**Rateio Troca de Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
-        st.write(f"**Est. Manutenção Geral/Dia:** R$ {custo_manut:.2f}")
+        st.write(f"**Rateio Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
+        st.write(f"**Est. Manutenção/Dia:** R$ {custo_manut:.2f}")
         st.write(f"---")
-        st.write(f"**OPEX Total Estimado/Dia:** R$ {(custo_energy_dia + custo_lonas_dia + custo_manut):.2f}")
+        st.write(f"**OPEX Total/Dia:** R$ {(custo_energy_dia + custo_lonas_dia + custo_manut):.2f}")
         
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
-        st.info(f"**Pressão:** {pressao_operacao} Bar")
 
+    # Botão de PDF
     st.sidebar.divider()
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
