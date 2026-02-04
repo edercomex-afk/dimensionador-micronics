@@ -46,33 +46,25 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SIDEBAR COMPLETA ---
+    # --- SIDEBAR ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**")
     num_opp = st.sidebar.text_input("**N° de OPP**")
     mercado_sel = st.sidebar.selectbox("**Mercado**", sorted(["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]))
-    
-    produtos = sorted([
-        "Concentrado de Cobre", "Concentrado de Ferro", "Concentrado de Grafite", "Concentrado de Ouro", 
-        "Concentrado de Terras Raras", "Efluente Industrial", "Lodo Biológico", "Rejeito de Cobre", 
-        "Rejeito de Ferro", "Rejeito de Grafite", "Rejeito de Terras Raras", "Outros"
-    ])
+    produtos = sorted(["Concentrado de Cobre", "Concentrado de Ferro", "Concentrado de Grafite", "Concentrado de Ouro", "Concentrado de Terras Raras", "Efluente Industrial", "Lodo Biológico", "Rejeito de Cobre", "Rejeito de Ferro", "Rejeito de Grafite", "Rejeito de Terras Raras", "Outros"])
     produto_sel = st.sidebar.selectbox("**Produto**", produtos)
-    
     responsavel = st.sidebar.text_input("**Responsável pelo Projeto**")
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("**Cidade**")
-    estados_br = sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"])
-    estado = col_est.selectbox("**Estado**", estados_br, index=24)
+    estado = col_est.selectbox("**Estado**", sorted(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]), index=24)
 
     st.sidebar.divider()
     st.sidebar.header("📥 **Parâmetros de Processo**")
     prod_seca_dia = st.sidebar.number_input("**Peso total dos Sólidos (T/Dia)**", value=0.0)
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 1, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
-    
     prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
     st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
     
@@ -117,7 +109,6 @@ def main():
 
     st.divider()
 
-    # --- TABELA DE DIMENSIONAMENTO (FILTRAGEM POR LIMITE DE PLACAS) ---
     st.write("### Dimensionamento de equipamento")
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80, "Preco_Lona": 150},
@@ -125,24 +116,34 @@ def main():
         {"Modelo": "800mm", "Vol_Placa": 15.0, "Area_Placa": 1.10, "Limite": 100, "Preco_Lona": 380},
         {"Modelo": "1000mm", "Vol_Placa": 25.0, "Area_Placa": 1.80, "Limite": 100, "Preco_Lona": 550},
         {"Modelo": "1200mm", "Vol_Placa": 45.0, "Area_Placa": 2.60, "Limite": 100, "Preco_Lona": 850},
-        {"Modelo": "1500mm", "Vol_Placa": 80.0, "Area_Placa": 4.10, "Limite": 150, "Preco_Lona": 1200},
-        {"Modelo": "2000mm", "Vol_Placa": 150.0, "Area_Placa": 7.50, "Limite": 180, "Preco_Lona": 2200},
+        {"Modelo": "1500mm", "Vol_Placa": 80.0, "Area_Placa": 4.10, "Limite": 180, "Preco_Lona": 1200},
+        {"Modelo": "2000mm", "Vol_Placa": 150.0, "Area_Placa": 7.50, "Limite": 210, "Preco_Lona": 2200},
         {"Modelo": "2500mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Limite": 180, "Preco_Lona": 3500},
     ]
 
+    # --- NOVA LÓGICA DE APRESENTAÇÃO COERENTE ---
     lista_exibicao = []
     custo_lonas_dia = 0
-    
-    for f in mapa_filtros:
+    idx_primeiro_valido = None
+
+    # 1. Encontrar o primeiro modelo que atende a carga
+    for i, f in enumerate(mapa_filtros):
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        
-        # REGRA: Só exibe se estiver dentro do limite técnico do modelo
         if 0 < num_placas <= f["Limite"]:
+            idx_primeiro_valido = i
+            break
+
+    # 2. Se encontrar, pegar esse e os próximos dois modelos (se existirem)
+    if idx_primeiro_valido is not None:
+        modelos_selecionados = mapa_filtros[idx_primeiro_valido : idx_primeiro_valido + 3]
+        
+        for i, f in enumerate(modelos_selecionados):
+            num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
             area_total = num_placas * f["Area_Placa"]
             taxa_filt = (prod_seca_hora * 1000) / area_total if area_total > 0 else 0
             
-            # Cálculo do OPEX Lonas para o primeiro modelo válido (ou o selecionado)
-            if not lista_exibicao:
+            # OPEX baseado no primeiro modelo da lista (o sugerido como ideal)
+            if i == 0:
                 valor_jogo = num_placas * f["Preco_Lona"]
                 dias_duracao = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 1
                 custo_lonas_dia = valor_jogo / dias_duracao if dias_duracao > 0 else 0
@@ -157,17 +158,13 @@ def main():
     df_selecao = pd.DataFrame(lista_exibicao)
     if not df_selecao.empty:
         st.table(df_selecao)
-        # Farol de Alerta baseado no primeiro equipamento sugerido
         taxa_ref = lista_exibicao[0]["Taxa (kg/m².h)"]
         if taxa_ref > 450: st.error(f"⚠️ **STATUS CRÍTICO:** Taxa de filtração excessiva!")
-        elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite de pressão.")
+        elif taxa_ref > 300: st.warning(f"🟡 **STATUS DE ATENÇÃO:** Taxa operando no limite.")
         elif taxa_ref > 0: st.success(f"✅ **STATUS NORMAL:** Parâmetros técnicos ideais.")
-    else:
-        st.warning("Nenhum modelo individual atende aos requisitos dentro do limite de placas. Verifique os parâmetros ou considere múltiplas unidades.")
+    else: st.warning("Carga fora de escala para equipamentos individuais ou dados insuficientes.")
 
     st.divider()
-    
-    # --- GRÁFICO E OPEX ---
     col_graph, col_stats = st.columns([2, 1])
     with col_graph:
         st.subheader("📊 Gráfico de Performance e Saturação")
@@ -184,20 +181,17 @@ def main():
         st.subheader("⚙️ Custos e Ciclos (OPEX)")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
         dias_vida = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 0
-        st.write(f"**Duração Estimada das Lonas:** {dias_vida:.1f} dias")
+        st.write(f"**Duração das Lonas:** {dias_vida:.1f} dias")
         st.write(f"---")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energy_dia:.2f}")
         custo_manut = custo_energy_dia * 0.20
-        st.write(f"**Rateio Troca de Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
-        st.write(f"**Est. Manutenção Geral/Dia:** R$ {custo_manut:.2f}")
+        st.write(f"**Rateio Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
+        st.write(f"**Est. Manutenção/Dia:** R$ {custo_manut:.2f}")
         st.write(f"---")
-        st.write(f"**OPEX Total Estimado/Dia:** R$ {(custo_energy_dia + custo_lonas_dia + custo_manut):.2f}")
-        
+        st.write(f"**OPEX Total/Dia:** R$ {(custo_energy_dia + custo_lonas_dia + custo_manut):.2f}")
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
         st.success(f"**Bomba Sugerida:** {tipo_bomba}")
-        st.info(f"**Pressão:** {pressao_operacao} Bar")
 
-    # Botão de PDF
     st.sidebar.divider()
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
