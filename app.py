@@ -10,18 +10,16 @@ import os
 # 1. Configuração de Página
 st.set_page_config(page_title="Dimensionador Micronics V53", layout="wide")
 
-# Função para Gerar PDF Completo (Com Gráfico e Tabela)
+# Função para Gerar PDF Completo
 def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg, fig):
     pdf = FPDF()
     pdf.add_page()
     
-    # Cabeçalho
     pdf.set_font("Arial", "B", 16)
     pdf.cell(190, 10, "CLEANOVA MICRONICS - MEMORIAL DE CALCULO", ln=True, align="C")
     pdf.set_font("Arial", "", 12)
     pdf.ln(5)
     
-    # Dados do Projeto
     pdf.set_fill_color(230, 230, 230)
     pdf.cell(190, 8, f" Identificacao do Projeto", ln=True, fill=True)
     pdf.set_font("Arial", "", 10)
@@ -32,7 +30,6 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
     pdf.cell(190, 7, f"Localidade: {cidade if cidade else '---'}/{estado}", ln=True)
     pdf.ln(5)
 
-    # Resumo Operacional
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 8, " Resumo Operacional", ln=True, fill=True)
     pdf.set_font("Arial", "", 10)
@@ -42,11 +39,9 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
     pdf.cell(95, 7, f"- Grav. Especifica Polpa: {sg:.3f}", ln=True)
     pdf.ln(5)
 
-    # Tabela de Dimensionamento
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 8, " Opcoes de Equipamento Propostas", ln=True, fill=True)
     pdf.set_font("Arial", "B", 9)
-    # Cabeçalho da Tabela
     pdf.cell(50, 7, "Equipamento", border=1)
     pdf.cell(40, 7, "Qtd Placas", border=1)
     pdf.cell(50, 7, "Area Total (m2)", border=1)
@@ -60,7 +55,6 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
         pdf.cell(50, 7, str(row['Taxa (kg/m².h)']), border=1, ln=True)
     pdf.ln(10)
 
-    # Inserção do Gráfico
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 8, " Grafico de Performance e Saturacao", ln=True, fill=True)
     
@@ -70,7 +64,6 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
         tmp_path = tmpfile.name
     
     os.remove(tmp_path)
-    
     return pdf.output(dest="S").encode("latin-1")
 
 def main():
@@ -81,7 +74,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SIDEBAR ---
+    # --- SIDEBAR COMPLETA ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("**Empresa**")
     nome_projeto = st.sidebar.text_input("**Nome do Projeto**")
@@ -105,6 +98,8 @@ def main():
     
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
+    
+    # CAMPO DE UMIDADE RESTAURADO AQUI
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
     
     st.sidebar.divider()
@@ -178,7 +173,6 @@ def main():
         st.write("### Dimensionamento de equipamento")
         st.table(df_selecao)
 
-    # --- GERAR GRÁFICO ---
     t = np.linspace(0, tempo_ciclo_min if tempo_ciclo_min > 0 else 60, 100)
     v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 1.5)) if taxa_fluxo_lodo_m3h > 0 else np.zeros(100)
     v_setpoint = np.full(100, vol_torta_ciclo_m3) if vol_torta_ciclo_m3 > 0 else np.zeros(100)
@@ -195,11 +189,13 @@ def main():
     with col_stats:
         st.subheader("⚙️ Custos e Ciclos (OPEX)")
         st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
+        dias_vida = vida_util_lona / ciclos_dia if ciclos_dia > 0 else 0
+        st.write(f"**Duração das Lonas:** {dias_vida:.1f} dias")
+        st.write(f"---")
         st.write(f"**Custo Energia/Dia:** R$ {custo_energy_dia:.2f}")
         st.write(f"**Rateio Lonas/Dia:** R$ {custo_lonas_dia:.2f}")
         st.success(f"**Bomba Sugerida:** {'PEMO' if pressao_operacao <= 6 else 'WARMAN'}")
 
-    # Botão de PDF Corrigido
     st.sidebar.divider()
     if not df_selecao.empty:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo, fig)
