@@ -33,7 +33,7 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
     pdf.set_font("Arial", "B", 12)
     pdf.cell(190, 8, " Resumo Operacional", ln=True, fill=True)
     pdf.set_font("Arial", "", 10)
-    pdf.cell(95, 7, f"- Volume de Polpa/Dia: {vol_dia:.2f} m3/dia")
+    pdf.cell(95, 7, f"- Volume de Lodo/Dia: {vol_dia:.2f} m3/dia")
     pdf.cell(95, 7, f"- Taxa de Fluxo: {fluxo_h:.2f} m3/h", ln=True)
     pdf.cell(95, 7, f"- Vazao de Pico: {pico:,.0f} L/h")
     pdf.cell(95, 7, f"- Grav. Especifica Polpa: {sg:.3f}", ln=True)
@@ -93,10 +93,12 @@ def main():
     prod_seca_dia = st.sidebar.number_input("**Peso total dos Sólidos (T/Dia)**", value=0.0)
     disponibilidade_perc = st.sidebar.slider("**Disponibilidade de Equipamento (%)**", 1, 100, 85)
     disponibilidade_h = (disponibilidade_perc / 100) * 24
+    prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
+    st.sidebar.info(f"⚖️ **Massa Seca (t/h):** {prod_seca_hora:.3f}")
     
-    # INPUT DE VOLUME - AGORA FUNCIONAL
     vol_lodo_dia_input = st.sidebar.number_input("**Volume de lodo/dia (m³)**", value=0.0)
     conc_solidos = st.sidebar.number_input("**Conc. Sólidos (%w/w)**", value=0.0)
+    
     umidade_torta = st.sidebar.number_input("**Umidade Final da Torta (%)**", value=20.0)
     
     st.sidebar.divider()
@@ -111,22 +113,12 @@ def main():
     custo_kwh_hora = st.sidebar.number_input("**Custo do KWH por hora (R$/h)**", value=0.0)
     pressao_operacao = st.sidebar.slider("**Pressão de Filtração (Bar)**", 1, 15, 6)
 
-    # --- LÓGICA DE CÁLCULO COM PRECEDÊNCIA ---
+    # --- CÁLCULOS ---
     try:
-        sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 1.0
-        
-        # Precedência: Se Volume Manual for preenchido (>0), ele manda.
-        if vol_lodo_dia_input > 0:
-            vol_lodo_dia_final = vol_lodo_dia_input
-            taxa_fluxo_lodo_m3h = vol_lodo_dia_final / disponibilidade_h if disponibilidade_h > 0 else 0
-            # Massa Seca recalculada para manter a taxa kg/m2.h correta
-            prod_seca_hora = (taxa_fluxo_lodo_m3h * sg_lodo * (conc_solidos/100))
-        else:
-            prod_seca_hora = prod_seca_dia / disponibilidade_h if disponibilidade_h > 0 else 0
-            massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
-            taxa_fluxo_lodo_m3h = (massa_polpa_hora / sg_lodo) if sg_lodo > 0 else 0
-            vol_lodo_dia_final = taxa_fluxo_lodo_m3h * disponibilidade_h
-
+        sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 0
+        massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
+        taxa_fluxo_lodo_m3h = (massa_polpa_hora / sg_lodo) if sg_lodo > 0 else 0
+        vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
         ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
         custo_energy_dia = disponibilidade_h * custo_kwh_hora
@@ -134,20 +126,17 @@ def main():
         massa_torta_ciclo = (prod_seca_hora * (tempo_ciclo_min / 60)) / (1 - (umidade_torta / 100)) if umidade_torta < 100 else 0
         vol_torta_ciclo_m3 = massa_torta_ciclo / 1.8 
     except:
-        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_final = vazao_pico_lh = vol_torta_ciclo_m3 = ciclos_dia = custo_energy_dia = 0.0
-
-    st.sidebar.info(f"⚖️ **Massa Seca (t/h) Ref:** {prod_seca_hora:.3f}")
+        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = vol_torta_ciclo_m3 = ciclos_dia = custo_energy_dia = 0.0
 
     st.write(f"### 🚀 Resumo Operacional")
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"**Vol. Lodo/Dia**\n\n {vol_lodo_dia_final:.2f} m³/dia")
+    with c1: st.info(f"**Vol. Lodo/Dia**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
     with c2: st.info(f"**Taxa Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
     with c3: st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
     with c4: st.info(f"**SG Lodo**\n\n {sg_lodo:.3f}")
 
     st.divider()
 
-    # MAPA DE FILTROS COM LIMITES ATUALIZADOS
     mapa_filtros = [
         {"Modelo": "470mm", "Vol_Placa": 5.0, "Area_Placa": 0.40, "Limite": 80, "Preco_Lona": 150},
         {"Modelo": "630mm", "Vol_Placa": 11.5, "Area_Placa": 0.70, "Limite": 90, "Preco_Lona": 250},
@@ -208,7 +197,7 @@ def main():
 
     st.sidebar.divider()
     if not df_selecao.empty:
-        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_final, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo, fig)
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_selecao, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo, fig)
         st.sidebar.download_button(label="📥 Gerar Memorial em PDF", data=pdf_data, file_name=f"Memorial_Micronics_{num_opp}.pdf", mime="application/pdf")
 
 if __name__ == "__main__":
