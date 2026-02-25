@@ -9,7 +9,7 @@ from fpdf import FPDF
 st.set_page_config(page_title="Dimensionador Micronics V53.3", layout="wide")
 
 # Função para Gerar PDF
-def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
+def create_pdf(empresa, projeto, opp, vendedor, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
@@ -18,7 +18,7 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
     pdf.ln(10)
     pdf.cell(190, 10, f"Empresa: {empresa}", ln=True)
     pdf.cell(190, 10, f"Projeto: {projeto} | OPP: {opp}", ln=True)
-    pdf.cell(190, 10, f"Responsavel: {responsavel}", ln=True)
+    pdf.cell(190, 10, f"Vendedor Responsavel: {vendedor}", ln=True)
     pdf.cell(190, 10, f"Localidade: {cidade}/{estado}", ln=True)
     pdf.ln(5)
     pdf.set_font("Arial", "B", 12)
@@ -41,7 +41,7 @@ def main():
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
-    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia | Responsável: Eder</p>
+    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia | Vendedor Responsável: Eder</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -50,7 +50,6 @@ def main():
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
     
-    # Nova lista de produtos completa solicitada pelo Eder
     produtos = [
         "Concentrado de cobre", "Carbonato de Lítio", "Concentrado de Ferro", 
         "Concentrado de Ouro", "Terras Raras", "Concentrado de Níquel", 
@@ -65,11 +64,10 @@ def main():
     nome_projeto = st.sidebar.text_input("Nome do Projeto", value="")
     num_opp = st.sidebar.text_input("N° de OPP", value="")
     mercado_sel = st.sidebar.selectbox("Mercado", mercados)
-    
-    # Box de seleção de Produto atualizado
     produto_sel = st.sidebar.selectbox("Produto", produtos)
     
-    responsavel_proj = st.sidebar.text_input("Responsável", value="Eder")
+    # ALTERAÇÃO SOLICITADA: VENDEDOR RESPONSÁVEL
+    vendedor_resp = st.sidebar.text_input("Vendedor Responsável", value="Eder")
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("Cidade", value="")
@@ -114,10 +112,10 @@ def main():
     st.write(f"### 🚀 Estudo Técnico: {produto_sel} - {empresa if empresa else '---'}")
     
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"**Produto Selecionado**\n\n {produto_sel}")
+    with c1: st.info(f"**Vendedor**\n\n {vendedor_resp}")
     with c2: st.info(f"**Taxa Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
     with c3: st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
-    with c4: st.info(f"**Grav. Específica Lodo**\n\n {sg_lodo:.3f}")
+    with c4: st.info(f"**SG Lodo**\n\n {sg_lodo:.3f}")
 
     st.divider()
 
@@ -141,8 +139,16 @@ def main():
             "Taxa (kg/m2.h)": 0.0
         })
 
+    # BOTÃO PDF ATUALIZADO
+    df_results = pd.DataFrame(selecao_final)
+    try:
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, vendedor_resp, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+    except:
+        st.sidebar.warning("Preencha os dados para o PDF.")
+
     st.write("### Tabela de Seleção Preliminar")
-    st.table(pd.DataFrame(selecao_final))
+    st.table(df_results)
 
 if __name__ == "__main__":
     main()
