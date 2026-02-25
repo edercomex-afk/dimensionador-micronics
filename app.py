@@ -33,8 +33,11 @@ def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df
     pdf.cell(190, 10, "TABELA DE SELECAO", ln=True)
     pdf.set_font("Arial", "", 10)
     for index, row in resultados_df.iterrows():
-        pdf.cell(190, 8, f"{row['Equipamento']} | Placas: {row['Qtd Placas']} | Area: {row['Área Total (m²)']} m2 | Taxa: {row['Taxa (kg/m².h)']}", ln=True)
-    return pdf.output(dest="S").encode("latin-1")
+        # Removendo acentos para evitar erro no FPDF padrão
+        pdf.cell(190, 8, f"{row['Equipamento']} | Placas: {row['Qtd Placas']} | Area: {row['Área Total (m²)']} m2 | Taxa: {row['Taxa (kg/m2.h)']}", ln=True)
+    
+    # Retorna o PDF como string binária
+    return pdf.output(dest="S").encode("latin-1", errors="replace")
 
 def main():
     # Cabeçalho Técnico (Banner Azul)
@@ -52,56 +55,57 @@ def main():
 
     # --- SIDEBAR ---
     st.sidebar.header("📋 Identificação do Projeto")
-    empresa = st.sidebar.text_input("*Empresa*", value="")
-    nome_projeto = st.sidebar.text_input("*Nome do Projeto*", value="")
-    num_opp = st.sidebar.text_input("*N° de OPP*", value="")
-    mercado_sel = st.sidebar.selectbox("*Mercado*", mercados)
-    responsavel = st.sidebar.text_input("*Responsável pelo Projeto*", value="")
+    empresa = st.sidebar.text_input("Empresa", value="")
+    nome_projeto = st.sidebar.text_input("Nome do Projeto", value="")
+    num_opp = st.sidebar.text_input("N° de OPP", value="")
+    mercado_sel = st.sidebar.selectbox("Mercado", mercados)
+    responsavel_proj = st.sidebar.text_input("Responsável pelo Projeto", value="Eder")
     
     col_cid, col_est = st.sidebar.columns(2)
-    cidade = col_cid.text_input("*Cidade*", value="")
-    estado = col_est.selectbox("*Estado*", estados_br, index=24)
+    cidade = col_cid.text_input("Cidade", value="")
+    estado = col_est.selectbox("Estado", estados_br, index=24)
 
     st.sidebar.divider()
-    st.sidebar.header("📥 *Parâmetros de Processo*")
-    prod_seca_dia = st.sidebar.number_input("*Massa Seca (t/Dia)*", value=0.0)
-    prod_seca_hora = st.sidebar.number_input("*Massa Seca (t/h)*", value=0.0)
-    vol_lodo_dia_input = st.sidebar.number_input("*Volume de lodo/dia (m³)*", value=0.0)
-    disponibilidade_h = st.sidebar.slider("*Disponibilidade de Equipamento (h/dia)*", 1, 24, 20)
-    conc_solidos = st.sidebar.number_input("*Conc. Sólidos (%w/w)*", value=0.0)
+    st.sidebar.header("📥 Parâmetros de Processo")
+    prod_seca_dia = st.sidebar.number_input("Massa Seca (t/Dia)", value=0.0)
+    prod_seca_hora = st.sidebar.number_input("Massa Seca (t/h)", value=0.0)
+    disponibilidade_h = st.sidebar.slider("Disponibilidade (h/dia)", 1, 24, 20)
+    conc_solidos = st.sidebar.number_input("Conc. Sólidos (%w/w)", value=0.0)
     
     st.sidebar.divider()
-    st.sidebar.header("🧬 *Densidade e Geometria*")
-    sg_solido = st.sidebar.number_input("*SG Sólido (g/cm³)*", value=2.70, format="%.2f")
-    espessura_camara = st.sidebar.number_input("*Espessura da Câmara (mm)*", value=40, step=1)
+    st.sidebar.header("🧬 Densidade e Geometria")
+    sg_solido = st.sidebar.number_input("Gravidade específica dos Sólidos Secos (g/cm³)", value=2.70, format="%.2f")
+    espessura_camara = st.sidebar.number_input("Espessura da Câmara (mm)", value=40, step=1)
     
     st.sidebar.divider()
-    st.sidebar.header("🔄 *Ciclos e Operação*")
-    vida_util_lona = st.sidebar.number_input("*Vida Útil da Lona (Ciclos)*", value=2000)
-    tempo_ciclo_min = st.sidebar.number_input("*Tempo de Ciclo (min)*", value=60)
-    custo_kwh_hora = st.sidebar.number_input("*Custo do KWH por hora (R$/h)*", value=0.0)
-    pressao_operacao = st.sidebar.slider("*Pressão de Filtração (Bar)*", 1, 15, 6)
+    st.sidebar.header("🔄 Ciclos e Operação")
+    vida_util_lona = st.sidebar.number_input("Vida Útil da Lona (Ciclos)", value=2000)
+    tempo_ciclo_min = st.sidebar.number_input("Tempo de Ciclo (min)", value=60)
+    custo_kwh_hora = st.sidebar.number_input("Custo do KWH (R$/h)", value=0.0)
+    pressao_operacao = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
 
     # --- NÚCLEO DE CÁLCULO ---
     try:
-        sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 0
+        # Cálculo da densidade da polpa (SG Lodo)
+        sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 1.0
         massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
         taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo if sg_lodo > 0 else 0
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
         ciclos_dia = (disponibilidade_h * 60) / tempo_ciclo_min if tempo_ciclo_min > 0 else 0
-        trocas_lona_ano = (ciclos_dia * 365) / vida_util_lona if vida_util_lona > 0 else 0
         custo_energia_diario = disponibilidade_h * custo_kwh_hora
     except:
-        sg_lodo = taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = 0.0
+        sg_lodo = 1.0
+        taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = 0.0
+        ciclos_dia = custo_energia_diario = 0.0
 
     # --- CARDS DE RESUMO OPERACIONAL ---
     st.write(f"### 🚀 Resumo Operacional: {empresa if empresa else '---'} - {nome_projeto if nome_projeto else '---'}")
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"*Vol. Lodo/Dia (Calc)*\n\n {vol_lodo_dia_calc:.2f} m³/dia")
-    with c2: st.info(f"*Taxa Fluxo Lodo*\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
-    with c3: st.info(f"*Vazão Pico*\n\n {vazao_pico_lh:,.0f} L/h")
-    with c4: st.info(f"*Grav. Específica Lodo*\n\n {sg_lodo:.3f}")
+    with c1: st.info(f"**Vol. Lodo/Dia (Calc)**\n\n {vol_lodo_dia_calc:.2f} m³/dia")
+    with c2: st.info(f"**Taxa Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
+    with c3: st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
+    with c4: st.info(f"**Grav. Específica Lodo**\n\n {sg_lodo:.3f}")
 
     st.divider()
 
@@ -125,13 +129,14 @@ def main():
             "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)
         })
 
-    # --- BOTÃO DE PDF NA SIDEBAR ---
     df_results = pd.DataFrame(selecao_final)
+
+    # --- BOTÃO DE PDF NA SIDEBAR ---
     try:
-        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
+        pdf_data = create_pdf(empresa, nome_projeto, num_opp, responsavel_proj, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
         st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
-    except:
-        st.sidebar.warning("Preencha os dados para habilitar o PDF.")
+    except Exception as e:
+        st.sidebar.warning("Preencha os dados básicos para o PDF.")
 
     # --- LAYOUT DE ABAS ---
     tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica & OPEX"])
@@ -140,17 +145,18 @@ def main():
         st.write("### Dimensionamento de Ativos")
         st.table(df_results)
         
-        # --- REGRAS DE STATUS TÉCNICO (PRESERVADAS) ---
-        taxa_referencia = selecao_final[2]["Taxa (kg/m².h)"] # Usando 1200mm como referência visual
-        if taxa_referencia > 450:
-            st.error(f"⚠️ *STATUS CRÍTICO:* Taxa de {taxa_referencia} kg/m².h excede o limite técnico de segurança!")
-        elif taxa_referencia > 300:
-            st.warning(f"🟡 *STATUS DE ATENÇÃO:* Taxa de {taxa_referencia} kg/m².h operando em zona de alerta.")
-        else:
-            st.success(f"✅ *STATUS NORMAL:* Taxa de {taxa_referencia} kg/m².h dentro dos parâmetros ideais.")
+        # Regras de Status
+        if not df_results.empty and selecao_final[2]["Taxa (kg/m².h)"] > 0:
+            taxa_referencia = selecao_final[2]["Taxa (kg/m².h)"]
+            if taxa_referencia > 450:
+                st.error(f"⚠️ STATUS CRÍTICO: Taxa de {taxa_referencia} kg/m².h excede o limite!")
+            elif taxa_referencia > 300:
+                st.warning(f"🟡 STATUS DE ATENÇÃO: Taxa de {taxa_referencia} kg/m².h em zona de alerta.")
+            else:
+                st.success(f"✅ STATUS NORMAL: Taxa de {taxa_referencia} kg/m².h ideal.")
 
         tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.info(f"*Bomba Sugerida:* {tipo_bomba} para operação em {pressao_operacao} Bar.")
+        st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
 
     with tab2:
         col_perf, col_opex = st.columns(2)
@@ -161,15 +167,15 @@ def main():
                 v_acumulado = np.sqrt(t * (taxa_fluxo_lodo_m3h * 2)) 
                 fig_perf, ax_perf = plt.subplots()
                 ax_perf.plot(t, v_acumulado, color='#003366', linewidth=2)
-                ax_perf.set_xlabel("Tempo de Ciclo (min)"); ax_perf.set_ylabel("Volume Acumulado (m³)")
+                ax_perf.set_xlabel("Tempo (min)"); ax_perf.set_ylabel("Volume (m³)")
                 st.pyplot(fig_perf)
         with col_opex:
             st.subheader("Custos e Ciclos")
-            st.write(f"*Ciclos Diários:* {ciclos_dia:.1f}")
-            st.write(f"*Custo Energia/Dia:* R$ {custo_energia_diario:.2f}")
+            st.write(f"**Ciclos Diários:** {ciclos_dia:.1f}")
+            st.write(f"**Custo Energia/Dia:** R$ {custo_energia_diario:.2f}")
             fig2, ax2 = plt.subplots(figsize=(4, 4))
             ax2.pie([50, 25, 25], labels=['Energia', 'Lonas', 'Manut'], autopct='%1.1f%%', colors=['#003366', '#ff9900', '#c0c0c0'])
             st.pyplot(fig2)
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
