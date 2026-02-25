@@ -41,7 +41,7 @@ def main():
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
-    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia | Vendedor Responsável: Eder</p>
+    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -66,8 +66,8 @@ def main():
     mercado_sel = st.sidebar.selectbox("Mercado", mercados)
     produto_sel = st.sidebar.selectbox("Produto", produtos)
     
-    # ALTERAÇÃO SOLICITADA: VENDEDOR RESPONSÁVEL
-    vendedor_resp = st.sidebar.text_input("Vendedor Responsável", value="Eder")
+    # BOX VAZIO CONFORME SOLICITADO
+    vendedor_resp = st.sidebar.text_input("Vendedor Responsável", value="")
     
     col_cid, col_est = st.sidebar.columns(2)
     cidade = col_cid.text_input("Cidade", value="")
@@ -95,13 +95,11 @@ def main():
     # --- NÚCLEO DE CÁLCULO ---
     try:
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 1.0
-        
         if vol_lodo_hora_input > 0:
             taxa_fluxo_lodo_m3h = vol_lodo_hora_input
         else:
             massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
             taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo if sg_lodo > 0 else 0
-            
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
     except:
@@ -110,16 +108,15 @@ def main():
 
     # --- EXIBIÇÃO ---
     st.write(f"### 🚀 Estudo Técnico: {produto_sel} - {empresa if empresa else '---'}")
-    
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"**Vendedor**\n\n {vendedor_resp}")
+    with c1: st.info(f"**Vendedor Responsável**\n\n {vendedor_resp if vendedor_resp else 'Não Informado'}")
     with c2: st.info(f"**Taxa Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
     with c3: st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
     with c4: st.info(f"**SG Lodo**\n\n {sg_lodo:.3f}")
 
     st.divider()
 
-    # Cálculo simplificado para tabela
+    # Cálculo da tabela
     vol_torta_ciclo_m3 = (taxa_fluxo_lodo_m3h * (tempo_ciclo_min/60)) * (conc_solidos/100) * (sg_lodo/1.8) if taxa_fluxo_lodo_m3h > 0 else 0
     mapa_filtros = [
         {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
@@ -132,14 +129,8 @@ def main():
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         area_total = num_placas * f["Area_Placa"]
-        selecao_final.append({
-            "Equipamento": f["Modelo"], 
-            "Qtd Placas": int(num_placas), 
-            "Área Total (m2)": round(area_total, 2), 
-            "Taxa (kg/m2.h)": 0.0
-        })
+        selecao_final.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m2)": round(area_total, 2), "Taxa (kg/m2.h)": 0.0})
 
-    # BOTÃO PDF ATUALIZADO
     df_results = pd.DataFrame(selecao_final)
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, vendedor_resp, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
