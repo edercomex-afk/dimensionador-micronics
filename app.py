@@ -6,7 +6,7 @@ import numpy as np
 from fpdf import FPDF
 
 # 1. Configuração de Página
-st.set_page_config(page_title="Dimensionador Micronics V53.4", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V53.5", layout="wide")
 
 # Função para Gerar PDF
 def create_pdf(empresa, projeto, opp, vendedor, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
@@ -45,6 +45,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
+    # Listas de Seleção
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
@@ -65,7 +66,7 @@ def main():
 
     st.sidebar.divider()
     
-    # --- SIDEBAR: PARÂMETROS DE PROCESSO (CAMPOS REINSERIDOS) ---
+    # --- SIDEBAR: PARÂMETROS DE PROCESSO ---
     st.sidebar.header("📥 Parâmetros de Processo")
     prod_seca_dia = st.sidebar.number_input("Massa Seca (t/Dia)", value=0.0)
     prod_seca_hora = st.sidebar.number_input("Massa Seca (t/h)", value=0.0)
@@ -88,7 +89,6 @@ def main():
     try:
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 1.0
         
-        # Lógica de cálculo priorizando a massa seca por hora ou volume por hora
         if vol_lodo_hora_input > 0:
             taxa_fluxo_lodo_m3h = vol_lodo_hora_input
         elif prod_seca_hora > 0:
@@ -113,32 +113,60 @@ def main():
 
     st.divider()
 
-    # Tabela de dimensionamento
-    vol_torta_ciclo_m3 = (taxa_fluxo_lodo_m3h * (tempo_ciclo_min/60)) * (conc_solidos/100) * (sg_lodo/1.8) if taxa_fluxo_lodo_m3h > 0 else 0
-    mapa_filtros = [
-        {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
-        {"Modelo": "1200mm", "Vol_Placa": 45, "Area_Placa": 2.6},
-        {"Modelo": "1500mm", "Vol_Placa": 80, "Area_Placa": 4.1},
-        {"Modelo": "2000mm", "Vol_Placa": 150, "Area_Placa": 7.5},
-    ]
+    # --- TABELAS E ABAS ---
+    tab1, tab2 = st.tabs(["📋 Seleção de Ativos", "📈 Performance Dinâmica"])
 
-    selecao_final = []
-    for f in mapa_filtros:
-        num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-        area_total = num_placas * f["Area_Placa"]
-        selecao_final.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m2)": round(area_total, 2)})
+    with tab1:
+        vol_torta_ciclo_m3 = (taxa_fluxo_lodo_m3h * (tempo_ciclo_min/60)) * (conc_solidos/100) * (sg_lodo/1.8) if taxa_fluxo_lodo_m3h > 0 else 0
+        mapa_filtros = [
+            {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
+            {"Modelo": "1200mm", "Vol_Placa": 45, "Area_Placa": 2.6},
+            {"Modelo": "1500mm", "Vol_Placa": 80, "Area_Placa": 4.1},
+            {"Modelo": "2000mm", "Vol_Placa": 150, "Area_Placa": 7.5},
+        ]
 
-    df_results = pd.DataFrame(selecao_final)
-    
+        selecao_final = []
+        for f in mapa_filtros:
+            num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
+            area_total = num_placas * f["Area_Placa"]
+            selecao_final.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m2)": round(area_total, 2)})
+
+        df_results = pd.DataFrame(selecao_final)
+        st.table(df_results)
+        
+        tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
+        st.info(f"**Bomba Recomendada:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
+
+    with tab2:
+        st.subheader("Curva Estimada de Alimentação")
+        if taxa_fluxo_lodo_m3h > 0:
+            t = np.linspace(0, tempo_ciclo_min, 100)
+            # Simulação de vazão decrescente e pressão crescente
+            vazao_curva = vazao_pico_lh * np.exp(-0.08 * t)
+            pressao_curva = pressao_operacao * (1 - np.exp(-0.12 * t))
+
+            fig, ax1 = plt.subplots(figsize=(10, 4))
+            ax1.set_xlabel('Tempo de Ciclo (min)')
+            ax1.set_ylabel('Vazão (L/h)', color='tab:blue')
+            ax1.plot(t, vazao_curva, color='tab:blue', linewidth=2, label='Vazão')
+            ax1.tick_params(axis='y', labelcolor='tab:blue')
+
+            ax2 = ax1.twinx()
+            ax2.set_ylabel('Pressão (Bar)', color='tab:red')
+            ax2.plot(t, pressao_curva, color='tab:red', linewidth=2, label='Pressão')
+            ax2.tick_params(axis='y', labelcolor='tab:red')
+            
+            fig.tight_layout()
+            st.pyplot(fig)
+        else:
+            st.warning("Insira os parâmetros de processo para visualizar o gráfico.")
+
     # PDF Button na sidebar
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, vendedor_resp, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
         st.sidebar.download_button(label="📥 Gerar PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
     except:
-        st.sidebar.warning("Verifique os dados para PDF.")
-
-    st.write("### Seleção Preliminar de Equipamentos")
-    st.table(df_results)
+        pass
 
 if __name__ == "__main__":
     main()
