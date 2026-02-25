@@ -6,7 +6,7 @@ import numpy as np
 from fpdf import FPDF
 
 # 1. Configuração de Página
-st.set_page_config(page_title="Dimensionador Micronics V53.2", layout="wide")
+st.set_page_config(page_title="Dimensionador Micronics V53.3", layout="wide")
 
 # Função para Gerar PDF
 def create_pdf(empresa, projeto, opp, responsavel, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
@@ -45,12 +45,19 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
+    # Listas de Seleção
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
     
-    # Lista de produtos conforme solicitado
-    produtos = ["Concentrado", "Rejeito", "Minério de Ferro", "Lodo Biológico", "Outros"]
+    # Nova lista de produtos completa solicitada pelo Eder
+    produtos = [
+        "Concentrado de cobre", "Carbonato de Lítio", "Concentrado de Ferro", 
+        "Concentrado de Ouro", "Terras Raras", "Concentrado de Níquel", 
+        "Rejeito de terras raras", "Rejeito de Minério de Ferro", "Rejeito de Cobre", 
+        "Efluente industrial", "Lodo Biológico", "Massa Negra", 
+        "Concentrado de Zinco", "Lama Vermelha", "Outros"
+    ]
 
     # --- SIDEBAR: IDENTIFICAÇÃO ---
     st.sidebar.header("📋 Identificação do Projeto")
@@ -59,7 +66,7 @@ def main():
     num_opp = st.sidebar.text_input("N° de OPP", value="")
     mercado_sel = st.sidebar.selectbox("Mercado", mercados)
     
-    # Box de seleção de Produto (Editável/Sem automação de cálculos)
+    # Box de seleção de Produto atualizado
     produto_sel = st.sidebar.selectbox("Produto", produtos)
     
     responsavel_proj = st.sidebar.text_input("Responsável", value="Eder")
@@ -73,10 +80,7 @@ def main():
     # --- SIDEBAR: PARÂMETROS DE PROCESSO ---
     st.sidebar.header("📥 Parâmetros de Processo")
     prod_seca_hora = st.sidebar.number_input("Massa Seca (t/h)", value=0.0)
-    
-    # Box para inserir volume de lodo por hora
     vol_lodo_hora_input = st.sidebar.number_input("Volume de lodo/hora (m³/h)", value=0.0)
-    
     disponibilidade_h = st.sidebar.slider("Disponibilidade (h/dia)", 1, 24, 20)
     conc_solidos = st.sidebar.number_input("Conc. Sólidos (%w/w)", value=0.0)
     
@@ -94,7 +98,6 @@ def main():
     try:
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 1.0
         
-        # Prioriza o volume manual se preenchido
         if vol_lodo_hora_input > 0:
             taxa_fluxo_lodo_m3h = vol_lodo_hora_input
         else:
@@ -107,18 +110,18 @@ def main():
         sg_lodo = 1.0
         taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = 0.0
 
-    # --- EXIBIÇÃO PRINCIPAL ---
+    # --- EXIBIÇÃO ---
     st.write(f"### 🚀 Estudo Técnico: {produto_sel} - {empresa if empresa else '---'}")
     
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"**Produto**\n\n {produto_sel}")
-    with c2: st.info(f"**Fluxo de Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
+    with c1: st.info(f"**Produto Selecionado**\n\n {produto_sel}")
+    with c2: st.info(f"**Taxa Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
     with c3: st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
-    with c4: st.info(f"**SG Lodo**\n\n {sg_lodo:.3f}")
+    with c4: st.info(f"**Grav. Específica Lodo**\n\n {sg_lodo:.3f}")
 
     st.divider()
 
-    # Tabela de dimensionamento simplificada
+    # Cálculo simplificado para tabela
     vol_torta_ciclo_m3 = (taxa_fluxo_lodo_m3h * (tempo_ciclo_min/60)) * (conc_solidos/100) * (sg_lodo/1.8) if taxa_fluxo_lodo_m3h > 0 else 0
     mapa_filtros = [
         {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
@@ -138,7 +141,7 @@ def main():
             "Taxa (kg/m2.h)": 0.0
         })
 
-    st.write("### Seleção de Ativos")
+    st.write("### Tabela de Seleção Preliminar")
     st.table(pd.DataFrame(selecao_final))
 
 if __name__ == "__main__":
