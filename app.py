@@ -53,24 +53,17 @@ pressao_manual = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 7)
 
 st.sidebar.markdown("---")
 
-# --- SEÇÃO CONFORME SUA IMAGEM: DENSIDADE E GEOMETRIA ---
+# --- ALTERAÇÃO SOLICITADA: FAMÍLIA DENSIDADE E GEOMETRIA ---
 st.sidebar.header("🧬 Densidade e Geometria")
-
-# Alteração direta para o campo solicitado
-ge_solidos = st.sidebar.number_input(
-    "Gravidade específica dos Sólidos Secos (g/cm³)", 
-    value=2.70, 
-    step=0.01,
-    format="%.2f"
+ge_lodo = st.sidebar.number_input(
+    "Gravidade Específica do Lodo (S.G.)", 
+    min_value=1.0, 
+    max_value=5.0, 
+    value=1.2, 
+    step=0.1,
+    help="Insira a gravidade específica dos sólidos do lodo."
 )
-
-espessura_camara = st.sidebar.number_input(
-    "Espessura da Câmara (mm)", 
-    value=40, 
-    step=1
-)
-
-st.sidebar.markdown("---")
+# --------------------------------------------------------
 
 # Lógica de Marcas (Pemo / Weir)
 if pressao_manual <= 6:
@@ -92,8 +85,7 @@ with col_info:
     st.info(f"**Marca Recomendada:** \n{marca}")
     st.success(f"**Linha Proposta:** \n{linha}")
     st.metric("Pressão de Compactação", f"{pressao_manual} Bar")
-    st.metric("Gravidade Sólidos", f"{ge_solidos} g/cm³")
-    st.metric("Espessura Câmara", f"{espessura_camara} mm")
+    st.metric("Gravidade Específica", f"{ge_lodo} S.G.")
 
 # Tabela de Performance
 st.markdown("---")
@@ -103,6 +95,5 @@ st.table([
     {"Item": "Número de Placas", "Especificação": "80 unidades"},
     {"Item": "Bomba de Alimentação", "Especificação": f"{marca} - {linha}"},
     {"Item": "Pressão de Trabalho", "Especificação": f"{pressao_manual} Bar"},
-    {"Item": "Gravidade Específica Sólidos", f"Especificação": "{ge_solidos} g/cm³"},
-    {"Item": "Espessura da Câmara", "Especificação": f"{espessura_camara} mm"}
+    {"Item": "Gravidade Específica (S.G.)", "Especificação": f"{ge_lodo}"}
 ])
