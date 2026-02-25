@@ -6,7 +6,7 @@ import numpy as np
 from fpdf import FPDF
 
 # 1. Configuração de Página
-st.set_page_config(page_title="Dimensionador Micronics V53.3", layout="wide")
+st.set_page_config(page_title="Dimensionador Micronics V53.4", layout="wide")
 
 # Função para Gerar PDF
 def create_pdf(empresa, projeto, opp, vendedor, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
@@ -33,11 +33,11 @@ def create_pdf(empresa, projeto, opp, vendedor, cidade, estado, resultados_df, v
     pdf.cell(190, 10, "TABELA DE SELECAO", ln=True)
     pdf.set_font("Arial", "", 10)
     for index, row in resultados_df.iterrows():
-        pdf.cell(190, 8, f"{row['Equipamento']} | Placas: {row['Qtd Placas']} | Area: {row['Área Total (m2)']} m2 | Taxa: {row['Taxa (kg/m2.h)']}", ln=True)
+        pdf.cell(190, 8, f"{row['Equipamento']} | Placas: {row['Qtd Placas']} | Area: {row['Área Total (m2)']} m2", ln=True)
     return pdf.output(dest="S").encode("latin-1", errors="replace")
 
 def main():
-    # Cabeçalho Técnico (Banner Azul)
+    # Cabeçalho Técnico
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
@@ -45,18 +45,10 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    # Listas de Seleção
     estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
     mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
-    
-    produtos = [
-        "Concentrado de cobre", "Carbonato de Lítio", "Concentrado de Ferro", 
-        "Concentrado de Ouro", "Terras Raras", "Concentrado de Níquel", 
-        "Rejeito de terras raras", "Rejeito de Minério de Ferro", "Rejeito de Cobre", 
-        "Efluente industrial", "Lodo Biológico", "Massa Negra", 
-        "Concentrado de Zinco", "Lama Vermelha", "Outros"
-    ]
+    produtos = ["Concentrado de cobre", "Carbonato de Lítio", "Concentrado de Ferro", "Concentrado de Ouro", "Terras Raras", "Concentrado de Níquel", "Rejeito de terras raras", "Rejeito de Minério de Ferro", "Rejeito de Cobre", "Efluente industrial", "Lodo Biológico", "Massa Negra", "Concentrado de Zinco", "Lama Vermelha", "Outros"]
 
     # --- SIDEBAR: IDENTIFICAÇÃO ---
     st.sidebar.header("📋 Identificação do Projeto")
@@ -65,8 +57,6 @@ def main():
     num_opp = st.sidebar.text_input("N° de OPP", value="")
     mercado_sel = st.sidebar.selectbox("Mercado", mercados)
     produto_sel = st.sidebar.selectbox("Produto", produtos)
-    
-    # BOX VAZIO CONFORME SOLICITADO
     vendedor_resp = st.sidebar.text_input("Vendedor Responsável", value="")
     
     col_cid, col_est = st.sidebar.columns(2)
@@ -75,16 +65,18 @@ def main():
 
     st.sidebar.divider()
     
-    # --- SIDEBAR: PARÂMETROS DE PROCESSO ---
+    # --- SIDEBAR: PARÂMETROS DE PROCESSO (CAMPOS REINSERIDOS) ---
     st.sidebar.header("📥 Parâmetros de Processo")
+    prod_seca_dia = st.sidebar.number_input("Massa Seca (t/Dia)", value=0.0)
     prod_seca_hora = st.sidebar.number_input("Massa Seca (t/h)", value=0.0)
+    vol_lodo_dia_input = st.sidebar.number_input("Volume de lodo/dia (m³)", value=0.0)
     vol_lodo_hora_input = st.sidebar.number_input("Volume de lodo/hora (m³/h)", value=0.0)
     disponibilidade_h = st.sidebar.slider("Disponibilidade (h/dia)", 1, 24, 20)
     conc_solidos = st.sidebar.number_input("Conc. Sólidos (%w/w)", value=0.0)
     
     st.sidebar.divider()
     st.sidebar.header("🧬 Densidade e Geometria")
-    sg_solido = st.sidebar.number_input("Gravidade específica dos Sólidos Secos (g/cm³)", value=2.70, format="%.2f")
+    sg_solido = st.sidebar.number_input("Gravidade específica (g/cm³)", value=2.70, format="%.2f")
     espessura_camara = st.sidebar.number_input("Espessura da Câmara (mm)", value=40, step=1)
     
     st.sidebar.divider()
@@ -95,11 +87,16 @@ def main():
     # --- NÚCLEO DE CÁLCULO ---
     try:
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 1.0
+        
+        # Lógica de cálculo priorizando a massa seca por hora ou volume por hora
         if vol_lodo_hora_input > 0:
             taxa_fluxo_lodo_m3h = vol_lodo_hora_input
-        else:
+        elif prod_seca_hora > 0:
             massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
             taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo if sg_lodo > 0 else 0
+        else:
+            taxa_fluxo_lodo_m3h = 0.0
+
         vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
         vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
     except:
@@ -109,14 +106,14 @@ def main():
     # --- EXIBIÇÃO ---
     st.write(f"### 🚀 Estudo Técnico: {produto_sel} - {empresa if empresa else '---'}")
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"**Vendedor Responsável**\n\n {vendedor_resp if vendedor_resp else 'Não Informado'}")
-    with c2: st.info(f"**Taxa Fluxo Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
+    with c1: st.info(f"**Vendedor**\n\n {vendedor_resp if vendedor_resp else 'Não Informado'}")
+    with c2: st.info(f"**Fluxo de Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
     with c3: st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
     with c4: st.info(f"**SG Lodo**\n\n {sg_lodo:.3f}")
 
     st.divider()
 
-    # Cálculo da tabela
+    # Tabela de dimensionamento
     vol_torta_ciclo_m3 = (taxa_fluxo_lodo_m3h * (tempo_ciclo_min/60)) * (conc_solidos/100) * (sg_lodo/1.8) if taxa_fluxo_lodo_m3h > 0 else 0
     mapa_filtros = [
         {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
@@ -129,16 +126,18 @@ def main():
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         area_total = num_placas * f["Area_Placa"]
-        selecao_final.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m2)": round(area_total, 2), "Taxa (kg/m2.h)": 0.0})
+        selecao_final.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m2)": round(area_total, 2)})
 
     df_results = pd.DataFrame(selecao_final)
+    
+    # PDF Button na sidebar
     try:
         pdf_data = create_pdf(empresa, nome_projeto, num_opp, vendedor_resp, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
-        st.sidebar.download_button(label="📥 Gerar Relatório PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
+        st.sidebar.download_button(label="📥 Gerar PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
     except:
-        st.sidebar.warning("Preencha os dados para o PDF.")
+        st.sidebar.warning("Verifique os dados para PDF.")
 
-    st.write("### Tabela de Seleção Preliminar")
+    st.write("### Seleção Preliminar de Equipamentos")
     st.table(df_results)
 
 if __name__ == "__main__":
