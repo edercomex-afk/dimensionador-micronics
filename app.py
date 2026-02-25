@@ -1,172 +1,90 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import math
 import numpy as np
 from fpdf import FPDF
 
 # 1. Configuração de Página
-st.set_page_config(page_title="Cleanova Micronics | V53.5", layout="wide")
-
-# Função para Gerar PDF
-def create_pdf(empresa, projeto, opp, vendedor, cidade, estado, resultados_df, vol_dia, fluxo_h, pico, sg):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(190, 10, "CLEANOVA MICRONICS - MEMORIAL DE CALCULO", ln=True, align="C")
-    pdf.set_font("Arial", "", 12)
-    pdf.ln(10)
-    pdf.cell(190, 10, f"Empresa: {empresa}", ln=True)
-    pdf.cell(190, 10, f"Projeto: {projeto} | OPP: {opp}", ln=True)
-    pdf.cell(190, 10, f"Vendedor Responsavel: {vendedor}", ln=True)
-    pdf.cell(190, 10, f"Localidade: {cidade}/{estado}", ln=True)
-    pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 10, "RESUMO OPERACIONAL", ln=True)
-    pdf.set_font("Arial", "", 11)
-    pdf.cell(190, 8, f"- Volume de Lodo/Dia: {vol_dia:.2f} m3/dia", ln=True)
-    pdf.cell(190, 8, f"- Taxa de Fluxo: {fluxo_h:.2f} m3/h", ln=True)
-    pdf.cell(190, 8, f"- Vazao de Pico: {pico:,.0f} L/h", ln=True)
-    pdf.cell(190, 8, f"- Grav. Especifica: {sg:.3f}", ln=True)
-    pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(190, 10, "TABELA DE SELECAO", ln=True)
-    pdf.set_font("Arial", "", 10)
-    for index, row in resultados_df.iterrows():
-        pdf.cell(190, 8, f"{row['Equipamento']} | Placas: {row['Qtd Placas']} | Area: {row['Área Total (m2)']} m2", ln=True)
-    return pdf.output(dest="S").encode("latin-1", errors="replace")
+st.set_page_config(page_title="Cleanova Micronics | V53.6", layout="wide")
 
 def main():
     # Cabeçalho Técnico
     st.markdown("""
     <div style="background-color:#003366;padding:20px;border-radius:10px;margin-bottom:20px">
     <h1 style="color:white;text-align:center;margin:0;">CLEANOVA MICRONICS - DIMENSIONADOR V53</h1>
-    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia</p>
+    <p style="color:white;text-align:center;margin:5px;">Memorial de Cálculo de Engenharia | Lógica de Placas Atualizada</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Listas de Seleção
-    estados_br = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
-                  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
-    mercados = ["Mineração", "Químico", "Farmacêutico", "Cervejaria", "Sucos", "Fertilizantes", "Outros"]
-    produtos = ["Concentrado de cobre", "Carbonato de Lítio", "Concentrado de Ferro", "Concentrado de Ouro", "Terras Raras", "Concentrado de Níquel", "Rejeito de terras raras", "Rejeito de Minério de Ferro", "Rejeito de Cobre", "Efluente industrial", "Lodo Biológico", "Massa Negra", "Concentrado de Zinco", "Lama Vermelha", "Outros"]
+    # --- CONFIGURAÇÃO TÉCNICA DOS FILTROS (CONFORME SOLICITADO) ---
+    # Adicionamos os volumes médios por placa para cada tamanho para viabilizar o cálculo
+    config_filtros = [
+        {"Modelo": "470 x 470 mm", "Vol_Placa": 3.5, "Area_Placa": 0.38, "Min_Placas": 1, "Max_Placas": 36},
+        {"Modelo": "630 x 630 mm", "Vol_Placa": 7.5, "Area_Placa": 0.68, "Min_Placas": 14, "Max_Placas": 40},
+        {"Modelo": "800 x 800 mm", "Vol_Placa": 15.0, "Area_Placa": 1.10, "Min_Placas": 20, "Max_Placas": 60},
+        {"Modelo": "1000 x 1000 mm", "Vol_Placa": 25.0, "Area_Placa": 1.80, "Min_Placas": 30, "Max_Placas": 80},
+        {"Modelo": "1200 x 1200 mm", "Vol_Placa": 45.0, "Area_Placa": 2.60, "Min_Placas": 40, "Max_Placas": 100},
+        {"Modelo": "1500 x 1500 mm", "Vol_Placa": 80.0, "Area_Placa": 4.10, "Min_Placas": 60, "Max_Placas": 120},
+        {"Modelo": "2000 x 2000 mm", "Vol_Placa": 150.0, "Area_Placa": 7.50, "Min_Placas": 80, "Max_Placas": 180},
+        {"Modelo": "2500 x 2500 mm", "Vol_Placa": 250.0, "Area_Placa": 12.00, "Min_Placas": 100, "Max_Placas": 180},
+    ]
 
-    # --- SIDEBAR: IDENTIFICAÇÃO ---
+    # --- SIDEBAR ---
     st.sidebar.header("📋 Identificação do Projeto")
     empresa = st.sidebar.text_input("Empresa", value="")
     nome_projeto = st.sidebar.text_input("Nome do Projeto", value="")
     num_opp = st.sidebar.text_input("N° de OPP", value="")
-    mercado_sel = st.sidebar.selectbox("Mercado", mercados)
-    produto_sel = st.sidebar.selectbox("Produto", produtos)
+    produto_sel = st.sidebar.selectbox("Produto", ["Concentrado de cobre", "Carbonato de Lítio", "Concentrado de Ferro", "Concentrado de Ouro", "Terras Raras", "Concentrado de Níquel", "Rejeito de terras raras", "Rejeito de Minério de Ferro", "Rejeito de Cobre", "Efluente industrial", "Lodo Biológico", "Massa Negra", "Concentrado de Zinco", "Lama Vermelha", "Outros"])
     vendedor_resp = st.sidebar.text_input("Vendedor Responsável", value="")
     
-    col_cid, col_est = st.sidebar.columns(2)
-    cidade = col_cid.text_input("Cidade", value="")
-    estado = col_est.selectbox("Estado", estados_br, index=24)
-
     st.sidebar.divider()
-    
-    # --- SIDEBAR: PARÂMETROS DE PROCESSO ---
     st.sidebar.header("📥 Parâmetros de Processo")
-    prod_seca_dia = st.sidebar.number_input("Massa Seca (t/Dia)", value=0.0)
     prod_seca_hora = st.sidebar.number_input("Massa Seca (t/h)", value=0.0)
-    vol_lodo_dia_input = st.sidebar.number_input("Volume de lodo/dia (m³)", value=0.0)
     vol_lodo_hora_input = st.sidebar.number_input("Volume de lodo/hora (m³/h)", value=0.0)
     disponibilidade_h = st.sidebar.slider("Disponibilidade (h/dia)", 1, 24, 20)
     conc_solidos = st.sidebar.number_input("Conc. Sólidos (%w/w)", value=0.0)
-    
-    st.sidebar.divider()
-    st.sidebar.header("🧬 Densidade e Geometria")
-    sg_solido = st.sidebar.number_input("Gravidade específica (g/cm³)", value=2.70, format="%.2f")
-    espessura_camara = st.sidebar.number_input("Espessura da Câmara (mm)", value=40, step=1)
-    
-    st.sidebar.divider()
-    st.sidebar.header("🔄 Ciclos e Operação")
+    sg_solido = st.sidebar.number_input("Gravidade específica (g/cm³)", value=2.70)
     tempo_ciclo_min = st.sidebar.number_input("Tempo de Ciclo (min)", value=60)
-    pressao_operacao = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 6)
 
     # --- NÚCLEO DE CÁLCULO ---
     try:
         sg_lodo = 100 / ((conc_solidos / sg_solido) + (100 - conc_solidos)) if conc_solidos > 0 else 1.0
-        
-        if vol_lodo_hora_input > 0:
-            taxa_fluxo_lodo_m3h = vol_lodo_hora_input
-        elif prod_seca_hora > 0:
-            massa_polpa_hora = prod_seca_hora / (conc_solidos / 100) if conc_solidos > 0 else 0
-            taxa_fluxo_lodo_m3h = massa_polpa_hora / sg_lodo if sg_lodo > 0 else 0
-        else:
-            taxa_fluxo_lodo_m3h = 0.0
-
-        vol_lodo_dia_calc = taxa_fluxo_lodo_m3h * disponibilidade_h
-        vazao_pico_lh = (taxa_fluxo_lodo_m3h * 1000) * 1.3
+        taxa_fluxo = vol_lodo_hora_input if vol_lodo_hora_input > 0 else (prod_seca_hora / (conc_solidos/100) / sg_lodo if conc_solidos > 0 else 0)
+        vol_torta_ciclo_m3 = (taxa_fluxo * (tempo_ciclo_min/60)) * (conc_solidos/100) * (sg_lodo/1.8) if taxa_fluxo > 0 else 0
     except:
-        sg_lodo = 1.0
-        taxa_fluxo_lodo_m3h = vol_lodo_dia_calc = vazao_pico_lh = 0.0
+        taxa_fluxo = vol_torta_ciclo_m3 = 0.0
 
-    # --- EXIBIÇÃO ---
-    st.write(f"### 🚀 Estudo Técnico: {produto_sel} - {empresa if empresa else '---'}")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.info(f"**Vendedor**\n\n {vendedor_resp if vendedor_resp else 'Não Informado'}")
-    with c2: st.info(f"**Fluxo de Lodo**\n\n {taxa_fluxo_lodo_m3h:.2f} m³/h")
-    with c3: st.info(f"**Vazão Pico**\n\n {vazao_pico_lh:,.0f} L/h")
-    with c4: st.info(f"**SG Lodo**\n\n {sg_lodo:.3f}")
-
-    st.divider()
-
-    # --- TABELAS E ABAS ---
-    tab1, tab2 = st.tabs(["📋 Seleção de Ativos", "📈 Performance Dinâmica"])
+    # --- ABAS ---
+    tab1, tab2 = st.tabs(["📋 Seleção de Ativos", "⚙️ Configuração dos Limites"])
 
     with tab1:
-        vol_torta_ciclo_m3 = (taxa_fluxo_lodo_m3h * (tempo_ciclo_min/60)) * (conc_solidos/100) * (sg_lodo/1.8) if taxa_fluxo_lodo_m3h > 0 else 0
-        mapa_filtros = [
-            {"Modelo": "1000mm", "Vol_Placa": 25, "Area_Placa": 1.8},
-            {"Modelo": "1200mm", "Vol_Placa": 45, "Area_Placa": 2.6},
-            {"Modelo": "1500mm", "Vol_Placa": 80, "Area_Placa": 4.1},
-            {"Modelo": "2000mm", "Vol_Placa": 150, "Area_Placa": 7.5},
-        ]
-
-        selecao_final = []
-        for f in mapa_filtros:
-            num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
-            area_total = num_placas * f["Area_Placa"]
-            selecao_final.append({"Equipamento": f["Modelo"], "Qtd Placas": int(num_placas), "Área Total (m2)": round(area_total, 2)})
-
-        df_results = pd.DataFrame(selecao_final)
-        st.table(df_results)
+        st.write(f"### Filtros Sugeridos para: {produto_sel}")
         
-        tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
-        st.info(f"**Bomba Recomendada:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
+        sugestoes = []
+        for f in config_filtros:
+            qtd_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
+            
+            # APLICAÇÃO DA LÓGICA DE FILTRAGEM (MIN/MAX)
+            if f["Min_Placas"] <= qtd_placas <= f["Max_Placas"]:
+                area_total = qtd_placas * f["Area_Placa"]
+                sugestoes.append({
+                    "Modelo": f["Modelo"],
+                    "Placas Sugeridas": int(qtd_placas),
+                    "Área Total (m²)": round(area_total, 2),
+                    "Status": "✅ Adequado"
+                })
+
+        if sugestoes:
+            st.table(pd.DataFrame(sugestoes))
+        else:
+            st.warning("Nenhum modelo se encaixa nos limites de placas para este volume. Tente ajustar o tempo de ciclo ou a massa seca.")
 
     with tab2:
-        st.subheader("Curva Estimada de Alimentação")
-        if taxa_fluxo_lodo_m3h > 0:
-            t = np.linspace(0, tempo_ciclo_min, 100)
-            # Simulação de vazão decrescente e pressão crescente
-            vazao_curva = vazao_pico_lh * np.exp(-0.08 * t)
-            pressao_curva = pressao_operacao * (1 - np.exp(-0.12 * t))
-
-            fig, ax1 = plt.subplots(figsize=(10, 4))
-            ax1.set_xlabel('Tempo de Ciclo (min)')
-            ax1.set_ylabel('Vazão (L/h)', color='tab:blue')
-            ax1.plot(t, vazao_curva, color='tab:blue', linewidth=2, label='Vazão')
-            ax1.tick_params(axis='y', labelcolor='tab:blue')
-
-            ax2 = ax1.twinx()
-            ax2.set_ylabel('Pressão (Bar)', color='tab:red')
-            ax2.plot(t, pressao_curva, color='tab:red', linewidth=2, label='Pressão')
-            ax2.tick_params(axis='y', labelcolor='tab:red')
-            
-            fig.tight_layout()
-            st.pyplot(fig)
-        else:
-            st.warning("Insira os parâmetros de processo para visualizar o gráfico.")
-
-    # PDF Button na sidebar
-    try:
-        pdf_data = create_pdf(empresa, nome_projeto, num_opp, vendedor_resp, cidade, estado, df_results, vol_lodo_dia_calc, taxa_fluxo_lodo_m3h, vazao_pico_lh, sg_lodo)
-        st.sidebar.download_button(label="📥 Gerar PDF", data=pdf_data, file_name=f"Memorial_{num_opp}.pdf", mime="application/pdf")
-    except:
-        pass
+        st.subheader("Tabela de Referência: Limites por Modelo")
+        st.write("Esta é a lógica de restrição aplicada na aba de seleção:")
+        df_limites = pd.DataFrame(config_filtros)[["Modelo", "Min_Placas", "Max_Placas"]]
+        df_limites.columns = ["Tamanho do Filtro", "Qtd Mínima", "Qtd Máxima"]
+        st.table(df_limites)
 
 if __name__ == "__main__":
     main()
