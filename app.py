@@ -5,7 +5,7 @@ import numpy as np
 from fpdf import FPDF
 
 # Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V44", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V44.1", layout="wide")
 
 # --- FUNÇÃO PARA GERAR O GRÁFICO DE FILTRAÇÃO ---
 def plot_curva_filtracao(pressao_alvo, vazao_pico):
@@ -36,20 +36,41 @@ def plot_curva_filtracao(pressao_alvo, vazao_pico):
     fig.tight_layout()
     return fig
 
-# --- INTERFACE ---
-st.title("Cleanova Micronics | Dimensionador & Gráficos V44")
+# --- INTERFACE PRINCIPAL ---
+st.title("Cleanova Micronics | Dimensionador & Gráficos V44.1")
 st.markdown("---")
 
-# Dados Iniciais
+# Dados Iniciais de Identificação
 c1, c2, c3 = st.columns(3)
 cliente = c1.text_input("👤 Cliente")
 n_opp = c2.text_input("🔢 Nº OPP")
 responsavel = c3.text_input("👨‍💻 Responsável")
 
-# Sidebar
-st.sidebar.header("⚙️ Parâmetros Técnicos")
+# --- SIDEBAR (BARRA LATERAL) ---
+st.sidebar.header("⚙️ Parâmetros de Bombeamento")
 vazao_pico = st.sidebar.number_input("Vazão de Pico da Bomba (L/h)", value=50000.0)
 pressao_manual = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 7)
+
+st.sidebar.markdown("---")
+
+# --- SEÇÃO CONFORME SUA IMAGEM: DENSIDADE E GEOMETRIA ---
+st.sidebar.header("🧬 Densidade e Geometria")
+
+ge_solidos = st.sidebar.number_input(
+    "Gravidade específica dos Sólidos Secos (g/cm³)", 
+    value=2.70, 
+    step=0.01,
+    format="%.2f"
+)
+
+espessura_camara = st.sidebar.number_input(
+    "Espessura da Câmara (mm)", 
+    value=40, 
+    step=1
+)
+
+st.sidebar.markdown("---")
+# --------------------------------------------------------
 
 # Lógica de Marcas (Pemo / Weir)
 if pressao_manual <= 6:
@@ -63,26 +84,25 @@ st.subheader("📊 Comportamento Dinâmico da Filtração")
 col_graf, col_info = st.columns([2, 1])
 
 with col_graf:
-    # Gerar e mostrar o gráfico
     figura = plot_curva_filtracao(pressao_manual, vazao_pico)
     st.pyplot(figura)
-    st.caption("O gráfico acima simula a interação entre a Bomba e o Filtro Prensa durante o ciclo de 45 min.")
+    st.caption("Simulação da interação Bomba x Filtro Prensa.")
 
 with col_info:
     st.info(f"**Marca Recomendada:** \n{marca}")
     st.success(f"**Linha Proposta:** \n{linha}")
     st.metric("Pressão de Compactação", f"{pressao_manual} Bar")
-    st.metric("Vazão Inicial", f"{vazao_pico:,.0f} L/h")
+    st.metric("Gravidade Sólidos", f"{ge_solidos} g/cm³")
+    st.metric("Espessura Câmara", f"{espessura_camara} mm")
 
-# Tabela de Performance (Exemplo para preencher o app)
+# Tabela de Performance
 st.markdown("---")
 st.subheader("📋 Resumo do Estudo")
 st.table([
     {"Item": "Modelo do Filtro", "Especificação": "1500x1500mm"},
     {"Item": "Número de Placas", "Especificação": "80 unidades"},
     {"Item": "Bomba de Alimentação", "Especificação": f"{marca} - {linha}"},
-    {"Item": "Pressão de Trabalho", "Especificação": f"{pressao_manual} Bar"}
+    {"Item": "Pressão de Trabalho", "Especificação": f"{pressao_manual} Bar"},
+    {"Item": "Gravidade Específica Sólidos", "Especificação": f"{ge_solidos} g/cm³"},
+    {"Item": "Espessura da Câmara", "Especificação": f"{espessura_camara} mm"}
 ])
-
-# --- REQUISITOS PARA FUNCIONAR ---
-# Lembre-se de adicionar 'matplotlib' e 'numpy' no seu arquivo requirements.txt! Esse foi o ultimo código que geramos para trabalhar o projeto do dimensionadpr.
