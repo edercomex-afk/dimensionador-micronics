@@ -5,7 +5,7 @@ import numpy as np
 from fpdf import FPDF
 
 # Configuração da página
-st.set_page_config(page_title="Cleanova Micronics | V44.1", layout="wide")
+st.set_page_config(page_title="Cleanova Micronics | V44", layout="wide")
 
 # --- FUNÇÃO PARA GERAR O GRÁFICO DE FILTRAÇÃO ---
 def plot_curva_filtracao(pressao_alvo, vazao_pico):
@@ -37,7 +37,7 @@ def plot_curva_filtracao(pressao_alvo, vazao_pico):
     return fig
 
 # --- INTERFACE ---
-st.title("Cleanova Micronics | Dimensionador & Gráficos V44.1")
+st.title("Cleanova Micronics | Dimensionador & Gráficos V44")
 st.markdown("---")
 
 # Dados Iniciais
@@ -46,23 +46,10 @@ cliente = c1.text_input("👤 Cliente")
 n_opp = c2.text_input("🔢 Nº OPP")
 responsavel = c3.text_input("👨‍💻 Responsável")
 
-# --- SIDEBAR: PARÂMETROS TÉCNICOS ---
-st.sidebar.header("⚙️ Parâmetros de Bombeamento")
+# Sidebar
+st.sidebar.header("⚙️ Parâmetros Técnicos")
 vazao_pico = st.sidebar.number_input("Vazão de Pico da Bomba (L/h)", value=50000.0)
 pressao_manual = st.sidebar.slider("Pressão de Filtração (Bar)", 1, 15, 7)
-
-# --- NOVA SEÇÃO: DENSIDADE E GEOMETRIA ---
-st.sidebar.markdown("---")
-st.sidebar.header("🧬 Densidade e Geometria")
-ge_lodo = st.sidebar.number_input(
-    "Gravidade Específica do Lodo (S.G.)", 
-    min_value=1.0, 
-    max_value=5.0, 
-    value=1.2, 
-    step=0.1,
-    help="Densidade relativa dos sólidos para cálculo de massa seca."
-)
-concentracao_solidos = st.sidebar.slider("Concentração de Sólidos (%)", 1, 50, 5)
 
 # Lógica de Marcas (Pemo / Weir)
 if pressao_manual <= 6:
@@ -86,17 +73,16 @@ with col_info:
     st.success(f"**Linha Proposta:** \n{linha}")
     st.metric("Pressão de Compactação", f"{pressao_manual} Bar")
     st.metric("Vazão Inicial", f"{vazao_pico:,.0f} L/h")
-    st.metric("S.G. Informada", f"{ge_lodo}")
 
-# Tabela de Performance
+# Tabela de Performance (Exemplo para preencher o app)
 st.markdown("---")
 st.subheader("📋 Resumo do Estudo")
 st.table([
     {"Item": "Modelo do Filtro", "Especificação": "1500x1500mm"},
     {"Item": "Número de Placas", "Especificação": "80 unidades"},
     {"Item": "Bomba de Alimentação", "Especificação": f"{marca} - {linha}"},
-    {"Item": "Pressão de Trabalho", "Especificação": f"{pressao_manual} Bar"},
-    {"Item": "Gravidade Específica", "Especificação": f"{ge_lodo} S.G."}
+    {"Item": "Pressão de Trabalho", "Especificação": f"{pressao_manual} Bar"}
 ])
 
-st.markdown("> **Nota:** Certifique-se de que `matplotlib`, `numpy`, `streamlit` e `fpdf` estão no seu arquivo `requirements.txt`.")
+# --- REQUISITOS PARA FUNCIONAR ---
+# Lembre-se de adicionar 'matplotlib' e 'numpy' no seu arquivo requirements.txt! Esse foi o ultimo código que geramos para trabalhar o projeto do dimensionadpr.
