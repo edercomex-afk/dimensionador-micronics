@@ -127,4 +127,21 @@ def main():
     for f in mapa_filtros:
         num_placas = math.ceil((vol_torta_ciclo_m3 * 1000) / f["Vol_Placa"]) if vol_torta_ciclo_m3 > 0 else 0
         area_total = num_placas * f["Area_Placa"]
-        taxa_filt = (taxa_fluxo_lodo_m3h * (conc_solidos/100) *
+        taxa_filt = (taxa_fluxo_lodo_m3h * (conc_solidos/100) * 1000) / area_total if area_total > 0 else 0
+        selecao_final.append({
+            "Equipamento": f["Modelo"], "Qtd Placas": int(num_placas),
+            "Área Total (m²)": round(area_total, 2), "Taxa (kg/m².h)": round(taxa_filt, 2)
+        })
+
+    df_results = pd.DataFrame(selecao_final)
+
+    # Aba de exibição
+    tab1, tab2 = st.tabs(["📋 Seleção e Dimensionamento", "📉 Performance Dinâmica"])
+    with tab1:
+        st.write("### Dimensionamento de Ativos")
+        st.table(df_results)
+        tipo_bomba = "PEMO" if pressao_operacao <= 6 else "WARMAN"
+        st.info(f"**Bomba Sugerida:** {tipo_bomba} para operação em {pressao_operacao} Bar.")
+
+if __name__ == "__main__":
+    main()
